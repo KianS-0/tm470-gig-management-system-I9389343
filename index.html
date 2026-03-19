@@ -5,32 +5,73 @@
   <style>
     body {
       font-family: Arial, sans-serif;
-      margin: 40px;
+      margin: 0;
       line-height: 1.6;
+      background-color: #f4f4f4;
+      color: #222;
     }
 
     nav {
-      margin-bottom: 30px;
+      background-color: #111827;
+      padding: 20px 40px;
     }
 
     nav a {
-      margin-right: 15px;
+      color: white;
       text-decoration: none;
-      color: black;
+      margin-right: 20px;
       font-weight: bold;
     }
 
-    h1 {
+    .hero {
+      background-color: white;
+      padding: 60px 40px;
+    }
+
+    .hero h1 {
+      margin-top: 0;
+      font-size: 48px;
       margin-bottom: 10px;
     }
 
-    .intro {
+    .hero p {
       max-width: 700px;
+      font-size: 20px;
       margin-bottom: 30px;
     }
 
+    .button {
+      display: inline-block;
+      padding: 12px 20px;
+      margin-right: 10px;
+      text-decoration: none;
+      font-weight: bold;
+      border-radius: 6px;
+    }
+
+    .button-primary {
+      background-color: #2563eb;
+      color: white;
+    }
+
+    .button-secondary {
+      background-color: #e5e7eb;
+      color: #111827;
+    }
+
+    .content {
+      padding: 40px;
+    }
+
     .section {
+      background-color: white;
+      padding: 30px;
       margin-bottom: 25px;
+      border-radius: 8px;
+    }
+
+    ul {
+      padding-left: 20px;
     }
   </style>
 </head>
@@ -44,29 +85,29 @@
     <a href="#">Register</a>
   </nav>
 
-  <h1>GigTracker</h1>
+  <div class="hero">
+    <h1>GigTracker</h1>
+    <p>Your personal hub for tracking live music events, artists, venues, and attendance.</p>
 
-  <p class="intro">
-    Your personal hub for tracking live music events, artists, venues, and attendance.
-  </p>
-
-  <div class="section">
-    <h2>What you can do</h2>
-    <ul>
-      <li>Track upcoming gigs in one place</li>
-      <li>Save artists and venues you want to follow</li>
-      <li>Store ticket links for events</li>
-      <li>Record your attendance as Going, Maybe, or Went</li>
-    </ul>
+    <a href="#" class="button button-primary">View gigs</a>
+    <a href="#" class="button button-secondary">Register</a>
   </div>
 
-  <div class="section">
-    <h2>Start using GigTracker</h2>
-    <p>
-      <a href="#">Log in</a> |
-      <a href="#">Register</a> |
-      <a href="#">View gigs</a>
-    </p>
+  <div class="content">
+    <div class="section">
+      <h2>What you can do</h2>
+      <ul>
+        <li>Track upcoming gigs in one place</li>
+        <li>Save artists and venues you want to follow</li>
+        <li>Store ticket links for events</li>
+        <li>Record your attendance as Going, Maybe, or Went</li>
+      </ul>
+    </div>
+
+    <div class="section">
+      <h2>Start using GigTracker</h2>
+      <p>Log in, register, or browse your gigs from one simple place.</p>
+    </div>
   </div>
 </body>
 </html>
