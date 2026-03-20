@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>GigTracker - Edit Gig</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0;
+      line-height: 1.6;
+      background-color: #f4f4f4;
+      color: #222;
+    }
+
+    nav {
+      background-color: #111827;
+      padding: 20px 40px;
+    }
+
+    nav a {
+      color: white;
+      text-decoration: none;
+      margin-right: 20px;
+      font-weight: bold;
+    }
+
+    .page {
+      padding: 40px;
+    }
+
+    .card {
+      background-color: white;
+      padding: 30px;
+      border-radius: 8px;
+      max-width: 600px;
+    }
+
+    h1 {
+      margin-top: 0;
+    }
+
+    label {
+      display: block;
+      margin-top: 15px;
+      margin-bottom: 5px;
+      font-weight: bold;
+    }
+
+    input, select, textarea {
+      width: 100%;
+      padding: 10px;
+      box-sizing: border-box;
+      margin-bottom: 10px;
+    }
+
+    textarea {
+      min-height: 100px;
+      resize: vertical;
+    }
+
+    .button {
+      display: inline-block;
+      padding: 12px 20px;
+      text-decoration: none;
+      font-weight: bold;
+      border-radius: 6px;
+      background-color: #2563eb;
+      color: white;
+      border: none;
+      cursor: pointer;
+      margin-top: 10px;
+    }
+  </style>
+</head>
+<body>
+  <nav>
+    <a href="index.html">Home</a>
+    <a href="gigs.html">Gigs</a>
+    <a href="artists.html">Artists</a>
+    <a href="venues.html">Venues</a>
+    <a href="add-gig.html">Add Gig</a>
+    <a href="login.html">Login</a>
+    <a href="register.html">Register</a>
+  </nav>
+
+  <div class="page">
+    <div class="card">
+      <h1>Edit Gig</h1>
+      <p>Update the details for an existing live event.</p>
+
+      <label for="artist">Artist</label>
+      <input type="text" id="artist" value="The 1975">
+
+      <label for="venue">Venue</label>
+      <input type="text" id="venue" value="The O2 Arena, London">
+
+      <label for="date">Date</label>
+      <input type="date" id="date" value="2026-06-14">
+
+      <label for="time">Time</label>
+      <input type="time" id="time" value="19:30">
+
+      <label for="ticket-link">Ticket Link</label>
+      <input type="url" id="ticket-link" value="https://example.com">
+
+      <label for="status">Attendance Status</label>
+      <select id="status">
+        <option>Going</option>
+        <option selected>Maybe</option>
+        <option>Went</option>
+      </select>
+
+      <label for="notes">Notes</label>
+      <textarea id="notes">Remember to check ticket availability closer to the date.</textarea>
+
+      <button class="button">Save Changes</button>
+    </div>
+  </div>
+</body>
+</html>
