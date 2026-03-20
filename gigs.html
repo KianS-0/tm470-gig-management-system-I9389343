@@ -54,6 +54,33 @@
       margin-bottom: 20px;
       border-radius: 8px;
     }
+
+    .status {
+      display: inline-block;
+      padding: 6px 12px;
+      border-radius: 20px;
+      font-size: 14px;
+      font-weight: bold;
+      margin-top: 10px;
+    }
+
+    .status-going {
+      background-color: #dcfce7;
+      color: #166534;
+    }
+
+    .status-maybe {
+      background-color: #fef3c7;
+      color: #92400e;
+    }
+
+    .ticket-link {
+      display: inline-block;
+      margin-top: 10px;
+      color: #2563eb;
+      font-weight: bold;
+      text-decoration: none;
+    }
   </style>
 </head>
 <body>
@@ -77,14 +104,16 @@
       <h2>The 1975</h2>
       <p><strong>Venue:</strong> The O2 Arena, London</p>
       <p><strong>Date:</strong> 14 June 2026</p>
-      <p><strong>Status:</strong> Maybe</p>
+      <a href="https://example.com" class="ticket-link">View tickets</a><br>
+      <span class="status status-maybe">Maybe</span>
     </div>
 
     <div class="card">
       <h2>Arctic Monkeys</h2>
       <p><strong>Venue:</strong> Utilita Arena Birmingham</p>
       <p><strong>Date:</strong> 22 July 2026</p>
-      <p><strong>Status:</strong> Going</p>
+      <a href="https://example.com" class="ticket-link">View tickets</a><br>
+      <span class="status status-going">Going</span>
     </div>
   </div>
 </body>
