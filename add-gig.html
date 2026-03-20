@@ -45,11 +45,16 @@
       font-weight: bold;
     }
 
-    input, select {
+    input, select, textarea {
       width: 100%;
       padding: 10px;
       box-sizing: border-box;
       margin-bottom: 10px;
+    }
+
+    textarea {
+      min-height: 100px;
+      resize: vertical;
     }
 
     .button {
@@ -91,6 +96,9 @@
       <label for="date">Date</label>
       <input type="date" id="date">
 
+      <label for="time">Time</label>
+      <input type="time" id="time">
+
       <label for="ticket-link">Ticket Link</label>
       <input type="url" id="ticket-link" placeholder="Enter ticket link">
 
@@ -100,6 +108,9 @@
         <option>Maybe</option>
         <option>Went</option>
       </select>
+
+      <label for="notes">Notes</label>
+      <textarea id="notes" placeholder="Add any extra notes about the event"></textarea>
 
       <button class="button">Save Gig</button>
     </div>
