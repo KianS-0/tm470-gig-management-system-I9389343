@@ -263,3 +263,28 @@ I learned how server-side code can query a database and dynamically generate HTM
 
 **Next step:**  
 Make the add-gig form save new gig records into the SQLite database.
+
+
+---
+
+## New gigs saved from form to SQLite
+
+**Git commit:** `feat: save new gigs from form to SQLite`
+
+**What I did:**  
+I updated `add-gig.html` so that the form submits data using `POST` to the `/add-gig` route. I also updated `server.js` so the route reads the form data and saves the artist, venue, gig and attendance status into the SQLite database.
+
+**Why I did it:**  
+This implements the first real create operation for the gig management system. It moves the project beyond displaying seeded test data because users can now add their own gigs through the website.
+
+**What went well:**  
+The form submitted successfully, the data was stored in SQLite, and the user was redirected back to the `/gigs` page where the new gig appeared.
+
+**What did not go well:**  
+The implementation is still basic. It creates a new venue record each time and does not yet include advanced duplicate checking or full validation beyond required fields.
+
+**What I learned:**  
+I learned how an HTML form, an Express POST route and SQLite database inserts work together in a full-stack workflow. This links to TM352 client-server concepts, TM351 database concepts and TM354 incremental development.
+
+**Next step:**  
+Add edit and delete functionality for gigs, or improve validation before moving on to full CRUD.
