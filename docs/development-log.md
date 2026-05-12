@@ -210,3 +210,31 @@ I learned the difference between writing code in a JavaScript file and running c
 
 **Next step:**  
 Make the `/gigs` page display gig records from the SQLite database.
+
+docs/development-log.md
+
+At the bottom, paste this:
+
+---
+
+## Gigs displayed from SQLite database
+
+**Git commit:** `feat: display gigs from SQLite database`
+
+**What I did:**  
+I changed the `/gigs` route in `server.js` so that it queries the SQLite database and returns gig records. The query joins the `gigs`, `artists`, `venues` and `attendance` tables so that each gig includes its artist name, venue name, city and attendance status.
+
+**Why I did it:**  
+This was the first step in making the main gig list database-backed instead of relying on hard-coded HTML content. It directly supports the core project requirement to persist and display structured gig information.
+
+**What went well:**  
+The route worked successfully in the browser and returned the seeded gig data from SQLite. This proved that the Express server can retrieve relational data and return it through a web route.
+
+**What did not go well:**  
+The output is currently raw JSON rather than a styled web page. This is acceptable for this stage because the priority was to confirm the database connection and SQL query worked before improving the user interface.
+
+**What I learned:**  
+I learned how to use an SQL join to combine gig, artist, venue and attendance data into one result. This links to TM351 database concepts and TM352 client-server web development.
+
+**Next step:**  
+Convert the raw JSON output into a proper HTML gig list page so the user can view database records through the normal interface.
