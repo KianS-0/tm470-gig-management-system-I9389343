@@ -16,9 +16,33 @@ app.get("/", (req, res) => {
   res.sendFile(path.join(__dirname, "index.html"));
 });
 
-// Gigs page
+// Gigs page - reads gig data from SQLite
 app.get("/gigs", (req, res) => {
-  res.sendFile(path.join(__dirname, "gigs.html"));
+  const sql = `
+    SELECT 
+      gigs.id,
+      gigs.title,
+      gigs.gig_date,
+      gigs.ticket_url,
+      gigs.notes,
+      artists.name AS artist_name,
+      venues.name AS venue_name,
+      venues.city AS venue_city,
+      attendance.status AS attendance_status
+    FROM gigs
+    JOIN artists ON gigs.artist_id = artists.id
+    JOIN venues ON gigs.venue_id = venues.id
+    LEFT JOIN attendance ON attendance.gig_id = gigs.id
+    ORDER BY gigs.gig_date ASC
+  `;
+
+  db.all(sql, (err, gigs) => {
+    if (err) {
+      return res.status(500).send("Database error: " + err.message);
+    }
+
+    res.json(gigs);
+  });
 });
 
 // Add gig page
