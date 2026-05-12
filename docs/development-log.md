@@ -186,3 +186,27 @@ The project now has a working connection between the browser, Express server and
 
 **Next step:**  
 Add sample gig data and make the main gigs page display records from SQLite.
+
+---
+
+## Database seed script added
+
+**Git commit:** `build: add database seed script`
+
+**What I did:**  
+I created `seed-db.js` and added an npm script so sample data can be inserted into the SQLite database.
+
+**Why I did it:**  
+The database needs test data before I can make the main gigs page display records from SQLite. The seed script gives me a repeatable way to add sample artists, venues, gigs and attendance records.
+
+**What went well:**  
+The script ran successfully using `npm run seed-db` and inserted sample data into the database.
+
+**What did not go well:**  
+I accidentally pasted JavaScript into the terminal instead of the file editor at first. This caused Bash syntax errors, but it did not damage the project files. I corrected this by pasting the code into `seed-db.js` and running it properly through npm.
+
+**What I learned:**  
+I learned the difference between writing code in a JavaScript file and running commands in the terminal. I also learned that seed scripts are useful because they make testing database-backed pages easier and repeatable.
+
+**Next step:**  
+Make the `/gigs` page display gig records from the SQLite database.
