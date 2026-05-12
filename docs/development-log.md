@@ -162,3 +162,27 @@ Keeping schema.sql separate from the generated database file makes the database 
 
 Next step:
 Connect the Express application to SQLite and display gig data from the database.
+
+---
+
+## Express connected to SQLite database
+
+**Git commit:** `feat: connect Express server to SQLite database`
+
+**What I did:**  
+I created `database.js` to manage the SQLite connection and added a `/db-test` route in `server.js`.
+
+**Why I did it:**  
+This was needed to prove that the Express backend can communicate with the SQLite database before I start making the main gig pages database-backed.
+
+**What went well:**  
+The `/db-test` route worked in the browser and returned the number of records in the `gigs` table.
+
+**What did not go well:**  
+The route is currently only a technical test. It does not yet display gig data through the normal user interface.
+
+**What I learned:**  
+The project now has a working connection between the browser, Express server and SQLite database. This links to TM352 client-server concepts and TM351 database concepts.
+
+**Next step:**  
+Add sample gig data and make the main gigs page display records from SQLite.
