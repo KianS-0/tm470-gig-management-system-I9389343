@@ -7,8 +7,8 @@
     "doc": "docs"
   },
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
-  },
+  "start": "node server.js"
+},
   "repository": {
     "type": "git",
     "url": "git+https://github.com/KianS-0/tm470-gig-management-system-I9389343.git"
