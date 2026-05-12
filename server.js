@@ -50,6 +50,10 @@ app.get("/gigs", (req, res) => {
         <p><strong>Attendance:</strong> ${gig.attendance_status || "Not set"}</p>
         <p><strong>Notes:</strong> ${gig.notes || "No notes added"}</p>
         <p><a href="${gig.ticket_url}" target="_blank">Ticket link</a></p>
+
+        <form action="/delete-gig/${gig.id}" method="POST">
+          <button class="delete-button" type="submit">Delete Gig</button>
+        </form>
       </section>
     `).join("");
 
@@ -95,6 +99,16 @@ app.get("/gigs", (req, res) => {
 
           .gig-card h2 {
             margin-top: 0;
+          }
+
+          .delete-button {
+            background: #b91c1c;
+            color: white;
+            border: none;
+            padding: 0.6rem 1rem;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: bold;
           }
         </style>
       </head>
@@ -199,6 +213,35 @@ app.post("/add-gig", (req, res) => {
                 );
               }
             );
+          }
+        );
+      }
+    );
+  });
+});
+
+// Delete a gig
+app.post("/delete-gig/:id", (req, res) => {
+  const gigId = req.params.id;
+
+  db.serialize(() => {
+    db.run(
+      "DELETE FROM attendance WHERE gig_id = ?",
+      [gigId],
+      (attendanceErr) => {
+        if (attendanceErr) {
+          return res.status(500).send("Attendance delete error: " + attendanceErr.message);
+        }
+
+        db.run(
+          "DELETE FROM gigs WHERE id = ?",
+          [gigId],
+          (gigErr) => {
+            if (gigErr) {
+              return res.status(500).send("Gig delete error: " + gigErr.message);
+            }
+
+            res.redirect("/gigs");
           }
         );
       }
