@@ -1,0 +1,24 @@
+{
+  "name": "tm470-gig-management-system-i9389343",
+  "version": "1.0.0",
+  "description": "This project is a web application for tracking live music gigs, artists, venues, and attendance.",
+  "main": "index.js",
+  "directories": {
+    "doc": "docs"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/KianS-0/tm470-gig-management-system-I9389343.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/KianS-0/tm470-gig-management-system-I9389343/issues"
+  },
+  "homepage": "https://github.com/KianS-0/tm470-gig-management-system-I9389343#readme"
+}

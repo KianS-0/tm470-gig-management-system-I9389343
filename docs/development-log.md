@@ -5,3 +5,10 @@
 I created a separate Git branch before starting backend development. This preserved the original static HTML prototype and gave me a safe place to develop the Node.js, Express and SQLite version of the project.
 
 This decision supports a controlled iterative development process because the original static prototype remains available as evidence while the backend/database version is developed separately.
+
+
+
+I initialised the repository as a Node.js project so that it can be developed into an Express-based web application rather than remaining only a static HTML prototype.
+
+
+
