@@ -238,3 +238,28 @@ I learned how to use an SQL join to combine gig, artist, venue and attendance da
 
 **Next step:**  
 Convert the raw JSON output into a proper HTML gig list page so the user can view database records through the normal interface.
+
+
+---
+
+## Database gigs rendered as an HTML page
+
+**Git commit:** `feat: render database gigs as HTML page`
+
+**What I did:**  
+I updated the `/gigs` route so that gig records from SQLite are displayed as a normal HTML page instead of raw JSON.
+
+**Why I did it:**  
+The previous version proved that the database query worked, but the output was not suitable for users. This step makes the database-backed gig list visible through a clearer user interface.
+
+**What went well:**  
+The page successfully displayed the seeded gig data as a readable gig card, including the title, artist, venue, date, attendance status, notes and ticket link.
+
+**What did not go well:**  
+The styling is still basic and the page is generated directly inside `server.js`, which is not ideal for long-term maintainability. A later improvement could move repeated layout code into templates or shared files.
+
+**What I learned:**  
+I learned how server-side code can query a database and dynamically generate HTML output. This links the project’s database work to the user-facing web interface.
+
+**Next step:**  
+Make the add-gig form save new gig records into the SQLite database.
