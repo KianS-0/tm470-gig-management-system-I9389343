@@ -288,3 +288,24 @@ I learned how an HTML form, an Express POST route and SQLite database inserts wo
 
 **Next step:**  
 Add edit and delete functionality for gigs, or improve validation before moving on to full CRUD.
+
+---
+
+## Gigs deleted from SQLite database
+
+**Git commit:** `feat: delete gigs from SQLite database`
+
+**What I did:**  
+I added delete functionality to the database-backed gigs page. Each gig card now includes a delete button, which submits a request to the Express server. The server deletes the related attendance record first, then deletes the gig record from SQLite.
+
+**Why I did it:**  
+This adds another part of CRUD functionality. The system already allowed gigs to be created and displayed, but users also need to remove gigs that are no longer relevant or were added by mistake.
+
+**What went well:**  
+The delete button worked successfully. After deleting a test gig, the page redirected back to `/gigs` and the deleted gig no longer appeared.
+
+**What did not go well:**  
+The delete action does not yet ask for confirmation, so a user could delete a gig accidentally. This is acceptable for the current implementation stage, but a confirmation step would improve usability later.
+
+**What I learned:**  
+I learned that related records need to be handled carefully when deleting database data. In this case, the attendance record is deleted before the gig record to avoid leaving inconsistent data. This links to TM351 data integrity concepts and TM354 incremental development.
