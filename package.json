@@ -20,5 +20,8 @@
   "bugs": {
     "url": "https://github.com/KianS-0/tm470-gig-management-system-I9389343/issues"
   },
-  "homepage": "https://github.com/KianS-0/tm470-gig-management-system-I9389343#readme"
+  "homepage": "https://github.com/KianS-0/tm470-gig-management-system-I9389343#readme",
+  "dependencies": {
+    "express": "^5.2.1"
+  }
 }
