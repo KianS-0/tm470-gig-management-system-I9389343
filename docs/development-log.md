@@ -1,18 +1,143 @@
- Development Log
+# Development Log
 
 ## Backend development branch created
 
-I created a separate Git branch before starting backend development. This preserved the original static HTML prototype and gave me a safe place to develop the Node.js, Express and SQLite version of the project.
+**Git commit:** `docs: record start of backend development branch`
 
-This decision supports a controlled iterative development process because the original static prototype remains available as evidence while the backend/database version is developed separately.
+**What I did:**  
+I created a separate Git branch called `express-sqlite-development` before starting backend development.
 
+**Why I did it:**  
+This preserved the original static HTML prototype and gave me a safe place to develop the Node.js, Express and SQLite version of the project without risking the existing work.
 
+**What went well:**  
+The branch was created successfully and the original `main` branch remained unchanged.
 
-I initialised the repository as a Node.js project so that it can be developed into an Express-based web application rather than remaining only a static HTML prototype.
+**What did not go well:**  
+There were no major problems at this stage.
 
+**What I learned:**  
+Using a separate branch helps manage project risk and supports a controlled iterative development process. This links to TM354 software engineering practice because it creates a safer way to develop and review changes.
 
-I added an Express server and configured the project so the existing static pages can be served through backend routes. This is the first step in moving the prototype from static HTML towards a client-server web application.
+**Next step:**  
+Initialise the project as a Node.js application.
 
-Git commit: feat: serve static pages with ExpressWhat I did:I created server.js and added Express routes for the existing website pages, including home, gigs, add gig, artists, venues, login and register.Why I did it:This moved the project from separate static HTML files towards a client-server web application, which fits the original project plan and TM352 web-development concepts.What went well:The existing front-end pages could be reused, so I did not lose the earlier prototype work.What did not go well:The application still does not store data yet, so the next step is to add a SQLite database.What I learned:Express can serve different pages through routes, which provides the backend structure needed for later database-backed features.
-Next we will add SQLite, but only after checking clean status.
+---
 
+## Node.js project initialised
+
+**Git commit:** `build: initialise Node.js project`
+
+**What I did:**  
+I initialised the repository as a Node.js project, which created the `package.json` file.
+
+**Why I did it:**  
+The project needs to move beyond static HTML pages and become a server-based web application. Initialising Node.js prepares the project for an Express backend.
+
+**What went well:**  
+The `package.json` file was created successfully and recorded the basic project details.
+
+**What did not go well:**  
+I ran `npm init -y` twice by mistake, but this did not cause a problem because it simply rewrote the same project configuration.
+
+**What I learned:**  
+The `package.json` file is important because it records the project setup, scripts and dependencies. It will later show which packages are used for the backend and database.
+
+**Next step:**  
+Install Express so the application can be served through a backend server.
+
+---
+
+## Express web framework installed
+
+**Git commit:** `build: install Express web framework`
+
+**What I did:**  
+I installed Express using npm.
+
+**Why I did it:**  
+Express is needed to create the backend server for the web application. This supports the move from a static website to a client-server web application.
+
+**What went well:**  
+Express installed successfully and npm reported no vulnerabilities.
+
+**What did not go well:**  
+No major issues occurred.
+
+**What I learned:**  
+Express provides the server-side routing needed to serve different pages and later process form submissions. This links to TM352 concepts because the project now has the basis for client-server interaction.
+
+**Next step:**  
+Create the first Express server file.
+
+---
+
+## Static pages served through Express
+
+**Git commit:** `feat: serve static pages with Express`
+
+**What I did:**  
+I created `server.js` and added Express routes for the existing website pages, including home, gigs, add gig, artists, venues, login and register.
+
+**Why I did it:**  
+This moved the project from separate static HTML files towards a client-server web application. It also allowed the existing front-end prototype to be reused instead of discarded.
+
+**What went well:**  
+The server ran successfully using `npm start`, and the terminal showed that GigTracker was running on port 3000.
+
+**What did not go well:**  
+At this stage, the application still does not store data. The pages are now served through Express, but the gig information is still not database-backed.
+
+**What I learned:**  
+Express routes can be used to serve different pages in the application. This provides the backend structure needed for later database-backed features such as adding, editing and deleting gigs.
+
+**Next step:**  
+Install SQLite and begin adding persistent data storage.
+
+---
+
+## SQLite database package installed
+
+**Git commit:** `build: install SQLite database package`
+
+**What I did:**  
+I installed the SQLite package using npm.
+
+**Why I did it:**  
+The project needs a database so that gig, artist, venue and attendance information can be stored persistently rather than being hard-coded into HTML pages.
+
+**What went well:**  
+SQLite installed successfully and npm reported no vulnerabilities.
+
+**What did not go well:**  
+No major issues occurred at this stage.
+
+**What I learned:**  
+Installing the database package is the first step towards implementing the data-management part of the project. This links to TM351 because the project will use relational database concepts such as tables, primary keys, foreign keys and relationships.
+
+**Next step:**  
+Create the first SQLite database schema.
+
+---
+
+## Initial SQLite database schema created
+
+**Git commit planned:** `design: add initial SQLite database schema`
+
+**What I did:**  
+I created the first SQLite database schema for the gig management system. The schema includes tables for artists, venues, gigs and attendance.
+
+**Why I did it:**  
+The project needs a relational database so that gig information can be stored properly rather than being hard-coded into HTML pages. This supports the original project aim of creating a full web application with persistent data.
+
+**What went well:**  
+The main entities were clear from the project requirements. Artists, venues and gigs need separate tables because the same artist or venue may be linked to more than one gig.
+
+**What did not go well:**  
+At this stage the database schema is still basic. It does not yet include user accounts or following artists and venues. These will be added in later development increments.
+
+**What I learned:**  
+Separating data into related tables helps reduce duplication and supports data integrity. This links to TM351 database concepts such as tables, primary keys, foreign keys and relationships.
+
+**Next step:**  
+Connect the Express server to the SQLite database and create a way to initialise the database.
