@@ -125,6 +125,87 @@ app.get("/add-gig", (req, res) => {
   res.sendFile(path.join(__dirname, "add-gig.html"));
 });
 
+// Save a new gig from the Add Gig form
+app.post("/add-gig", (req, res) => {
+  const {
+    title,
+    artist,
+    venue,
+    city,
+    gig_date,
+    ticket_url,
+    attendance_status,
+    notes
+  } = req.body;
+
+  if (!title || !artist || !venue || !city || !gig_date) {
+    return res.status(400).send("Missing required fields.");
+  }
+
+  db.serialize(() => {
+    db.run(
+      "INSERT OR IGNORE INTO artists (name) VALUES (?)",
+      [artist]
+    );
+
+    db.run(
+      "INSERT INTO venues (name, city) VALUES (?, ?)",
+      [venue, city]
+    );
+
+    db.get(
+      "SELECT id FROM artists WHERE name = ?",
+      [artist],
+      (artistErr, artistRow) => {
+        if (artistErr) {
+          return res.status(500).send("Artist database error: " + artistErr.message);
+        }
+
+        db.get(
+          "SELECT id FROM venues WHERE name = ? AND city = ? ORDER BY id DESC LIMIT 1",
+          [venue, city],
+          (venueErr, venueRow) => {
+            if (venueErr) {
+              return res.status(500).send("Venue database error: " + venueErr.message);
+            }
+
+            db.run(
+              `INSERT INTO gigs 
+               (title, artist_id, venue_id, gig_date, ticket_url, notes)
+               VALUES (?, ?, ?, ?, ?, ?)`,
+              [
+                title,
+                artistRow.id,
+                venueRow.id,
+                gig_date,
+                ticket_url,
+                notes
+              ],
+              function (gigErr) {
+                if (gigErr) {
+                  return res.status(500).send("Gig database error: " + gigErr.message);
+                }
+
+                db.run(
+                  "INSERT INTO attendance (gig_id, status) VALUES (?, ?)",
+                  [this.lastID, attendance_status || "Maybe"],
+                  (attendanceErr) => {
+                    if (attendanceErr) {
+                      return res.status(500).send("Attendance database error: " + attendanceErr.message);
+                    }
+
+                    res.redirect("/gigs");
+                  }
+                );
+              }
+            );
+          }
+        );
+      }
+    );
+  });
+});
+
 // Artists page
 app.get("/artists", (req, res) => {
   res.sendFile(path.join(__dirname, "artists.html"));
@@ -145,6 +226,7 @@ app.get("/register", (req, res) => {
   res.sendFile(path.join(__dirname, "register.html"));
 });
 
+// Database test route
 app.get("/db-test", (req, res) => {
   db.get("SELECT COUNT(*) AS count FROM gigs", (err, row) => {
     if (err) {

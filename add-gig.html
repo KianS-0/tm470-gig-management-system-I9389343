@@ -87,32 +87,37 @@
       <h1>Add Gig</h1>
       <p>Add a new live event to your tracker.</p>
 
-      <label for="artist">Artist</label>
-      <input type="text" id="artist" placeholder="Enter artist name">
+      <form action="/add-gig" method="POST">
+  <label for="title">Gig Title</label>
+  <input type="text" id="title" name="title" placeholder="Enter gig title" required>
 
-      <label for="venue">Venue</label>
-      <input type="text" id="venue" placeholder="Enter venue name">
+  <label for="artist">Artist</label>
+  <input type="text" id="artist" name="artist" placeholder="Enter artist name" required>
 
-      <label for="date">Date</label>
-      <input type="date" id="date">
+  <label for="venue">Venue</label>
+  <input type="text" id="venue" name="venue" placeholder="Enter venue name" required>
 
-      <label for="time">Time</label>
-      <input type="time" id="time">
+  <label for="city">City</label>
+  <input type="text" id="city" name="city" placeholder="Enter city" required>
 
-      <label for="ticket-link">Ticket Link</label>
-      <input type="url" id="ticket-link" placeholder="Enter ticket link">
+  <label for="date">Date</label>
+  <input type="date" id="date" name="gig_date" required>
 
-      <label for="status">Attendance Status</label>
-      <select id="status">
-        <option>Going</option>
-        <option>Maybe</option>
-        <option>Went</option>
-      </select>
+  <label for="ticket-link">Ticket Link</label>
+  <input type="url" id="ticket-link" name="ticket_url" placeholder="Enter ticket link">
 
-      <label for="notes">Notes</label>
-      <textarea id="notes" placeholder="Add any extra notes about the event"></textarea>
+  <label for="status">Attendance Status</label>
+  <select id="status" name="attendance_status">
+    <option>Going</option>
+    <option>Maybe</option>
+    <option>Went</option>
+  </select>
 
-      <button class="button">Save Gig</button>
+  <label for="notes">Notes</label>
+  <textarea id="notes" name="notes" placeholder="Add any extra notes about the event"></textarea>
+
+  <button class="button" type="submit">Save Gig</button>
+</form>
     </div>
   </div>
 </body>
