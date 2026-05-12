@@ -141,3 +141,24 @@ Separating data into related tables helps reduce duplication and supports data i
 
 **Next step:**  
 Connect the Express server to the SQLite database and create a way to initialise the database.
+
+
+Git commit: build: add database initialisation script
+
+What I did:
+I created init-db.js and added an npm script so the SQLite database can be created from schema.sql.
+
+Why I did it:
+The project needs a repeatable way to create the database structure. This means the database can be recreated from the schema instead of relying on a manually created file.
+
+What went well:
+The database initialisation script ran successfully and created the database from schema.sql.
+
+What did not go well:
+The database is not connected to the website pages yet. At this stage it only creates the database structure.
+
+What I learned:
+Keeping schema.sql separate from the generated database file makes the database design clearer and easier to track in Git. This supports TM351 data-management concepts and TM354 version-control practice.
+
+Next step:
+Connect the Express application to SQLite and display gig data from the database.
