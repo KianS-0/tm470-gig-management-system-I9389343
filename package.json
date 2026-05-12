@@ -7,8 +7,9 @@
     "doc": "docs"
   },
   "scripts": {
-    "start": "node server.js"
-  },
+  "start": "node server.js",
+  "init-db": "node init-db.js"
+},
   "repository": {
     "type": "git",
     "url": "git+https://github.com/KianS-0/tm470-gig-management-system-I9389343.git"
