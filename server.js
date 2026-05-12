@@ -1,5 +1,6 @@
 const express = require("express");
 const path = require("path");
+const db = require("./database");
 
 const app = express();
 const PORT = 3000;
@@ -43,6 +44,16 @@ app.get("/login", (req, res) => {
 // Register page
 app.get("/register", (req, res) => {
   res.sendFile(path.join(__dirname, "register.html"));
+});
+
+app.get("/db-test", (req, res) => {
+  db.get("SELECT COUNT(*) AS count FROM gigs", (err, row) => {
+    if (err) {
+      return res.status(500).send("Database error: " + err.message);
+    }
+
+    res.send(`Database connected. Number of gigs: ${row.count}`);
+  });
 });
 
 app.listen(PORT, () => {
