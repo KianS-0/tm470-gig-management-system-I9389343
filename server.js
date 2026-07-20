@@ -817,7 +817,8 @@ app.get("/artists", (req, res) => {
 
           <main>
             <h1>Artists</h1>
-            <p>Artists stored in the SQLite database.</p>
+            <p>Browse and manage artists in your collection.</p>
+            <p><a href="/add-artist">Add Artist</a></p>
 
             ${artistCards}
           </main>
