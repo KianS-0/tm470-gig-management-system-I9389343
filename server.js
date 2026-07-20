@@ -607,6 +607,137 @@ app.post("/delete-gig/:id", (req, res) => {
   });
 });
 
+// Add artist page
+app.get("/add-artist", (req, res) => {
+  res.send(`
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <title>Add Artist - GigTracker</title>
+
+      <style>
+        body {
+          font-family: Arial, sans-serif;
+          margin: 0;
+          background: #f4f4f4;
+          color: #222;
+        }
+
+        nav {
+          background: #111827;
+          padding: 20px 40px;
+        }
+
+        nav a {
+          color: white;
+          text-decoration: none;
+          margin-right: 20px;
+          font-weight: bold;
+        }
+
+        main {
+          padding: 40px;
+        }
+
+        form {
+          background: white;
+          padding: 30px;
+          border-radius: 8px;
+          max-width: 600px;
+        }
+
+        label {
+          display: block;
+          margin-bottom: 8px;
+          font-weight: bold;
+        }
+
+        input {
+          width: 100%;
+          padding: 10px;
+          margin-bottom: 20px;
+          box-sizing: border-box;
+        }
+
+        button {
+          padding: 12px 20px;
+          background: #2563eb;
+          color: white;
+          border: none;
+          border-radius: 6px;
+          font-weight: bold;
+          cursor: pointer;
+        }
+      </style>
+    </head>
+
+    <body>
+      <nav>
+        <a href="/">Home</a>
+        <a href="/gigs">Gigs</a>
+        <a href="/add-gig">Add Gig</a>
+        <a href="/artists">Artists</a>
+        <a href="/venues">Venues</a>
+        <a href="/login">Login</a>
+        <a href="/register">Register</a>
+      </nav>
+
+      <main>
+        <h1>Add Artist</h1>
+
+        <form action="/add-artist" method="POST">
+          <label for="name">Artist Name</label>
+          <input type="text" id="name" name="name" required>
+
+          <button type="submit">Add Artist</button>
+        </form>
+      </main>
+    </body>
+    </html>
+  `);
+});
+
+// Save a new artist to SQLite
+app.post("/add-artist", (req, res) => {
+  const name = req.body.name ? req.body.name.trim() : "";
+
+  if (!name) {
+    return res.status(400).send("Artist name is required.");
+  }
+
+  db.get(
+    "SELECT id FROM artists WHERE LOWER(name) = LOWER(?)",
+    [name],
+    (findErr, existingArtist) => {
+      if (findErr) {
+        return res
+          .status(500)
+          .send("Artist lookup error: " + findErr.message);
+      }
+
+      if (existingArtist) {
+        return res.status(400).send("This artist already exists.");
+      }
+
+      db.run(
+        "INSERT INTO artists (name) VALUES (?)",
+        [name],
+        (insertErr) => {
+          if (insertErr) {
+            return res
+              .status(500)
+              .send("Artist insert error: " + insertErr.message);
+          }
+
+          res.redirect("/artists");
+        }
+      );
+    }
+  );
+});
+
 // Artists page - displays artists from SQLite
 app.get("/artists", (req, res) => {
   db.all(
