@@ -335,7 +335,162 @@ app.get("/edit-gig/:id", (req, res) => {
   });
 });
 
+// Save changes from the Edit Gig form
+app.post("/edit-gig/:id", (req, res) => {
+  const gigId = req.params.id;
 
+  const {
+    title,
+    artist,
+    venue,
+    city,
+    gig_date,
+    ticket_url,
+    attendance_status,
+    notes
+  } = req.body;
+
+  if (!title || !artist || !venue || !city || !gig_date) {
+    return res.status(400).send("Missing required fields.");
+  }
+
+  const validStatuses = ["Going", "Maybe", "Went"];
+
+  if (!validStatuses.includes(attendance_status)) {
+    return res.status(400).send("Invalid attendance status.");
+  }
+
+  // Continue updating the gig after artist and venue IDs are found
+  const updateGig = (artistId, venueId) => {
+    db.run(
+      `UPDATE gigs
+       SET title = ?,
+           artist_id = ?,
+           venue_id = ?,
+           gig_date = ?,
+           ticket_url = ?,
+           notes = ?
+       WHERE id = ?`,
+      [
+        title.trim(),
+        artistId,
+        venueId,
+        gig_date,
+        ticket_url ? ticket_url.trim() : "",
+        notes ? notes.trim() : "",
+        gigId
+      ],
+      function (gigErr) {
+        if (gigErr) {
+          return res
+            .status(500)
+            .send("Gig update error: " + gigErr.message);
+        }
+
+        if (this.changes === 0) {
+          return res.status(404).send("Gig not found.");
+        }
+
+        db.run(
+          "UPDATE attendance SET status = ? WHERE gig_id = ?",
+          [attendance_status, gigId],
+          function (attendanceErr) {
+            if (attendanceErr) {
+              return res
+                .status(500)
+                .send("Attendance update error: " + attendanceErr.message);
+            }
+
+            // Create an attendance record if one did not already exist
+            if (this.changes === 0) {
+              db.run(
+                "INSERT INTO attendance (gig_id, status) VALUES (?, ?)",
+                [gigId, attendance_status],
+                (insertErr) => {
+                  if (insertErr) {
+                    return res
+                      .status(500)
+                      .send("Attendance insert error: " + insertErr.message);
+                  }
+
+                  res.redirect("/gigs");
+                }
+              );
+            } else {
+              res.redirect("/gigs");
+            }
+          }
+        );
+      }
+    );
+  };
+
+  // Find or create the artist
+  db.get(
+    "SELECT id FROM artists WHERE LOWER(name) = LOWER(?)",
+    [artist.trim()],
+    (artistFindErr, artistRow) => {
+      if (artistFindErr) {
+        return res
+          .status(500)
+          .send("Artist lookup error: " + artistFindErr.message);
+      }
+
+      const continueWithArtist = (artistId) => {
+        // Find or create the venue
+        db.get(
+          `SELECT id FROM venues
+           WHERE LOWER(name) = LOWER(?)
+           AND LOWER(city) = LOWER(?)`,
+          [venue.trim(), city.trim()],
+          (venueFindErr, venueRow) => {
+            if (venueFindErr) {
+              return res
+                .status(500)
+                .send("Venue lookup error: " + venueFindErr.message);
+            }
+
+            if (venueRow) {
+              updateGig(artistId, venueRow.id);
+            } else {
+              db.run(
+                "INSERT INTO venues (name, city) VALUES (?, ?)",
+                [venue.trim(), city.trim()],
+                function (venueInsertErr) {
+                  if (venueInsertErr) {
+                    return res
+                      .status(500)
+                      .send("Venue insert error: " + venueInsertErr.message);
+                  }
+
+                  updateGig(artistId, this.lastID);
+                }
+              );
+            }
+          }
+        );
+      };
+
+      if (artistRow) {
+        continueWithArtist(artistRow.id);
+      } else {
+        db.run(
+          "INSERT INTO artists (name) VALUES (?)",
+          [artist.trim()],
+          function (artistInsertErr) {
+            if (artistInsertErr) {
+              return res
+                .status(500)
+                .send("Artist insert error: " + artistInsertErr.message);
+            }
+
+            continueWithArtist(this.lastID);
+          }
+        );
+      }
+    }
+  );
+});
 
 // Add gig page
 app.get("/add-gig", (req, res) => {
