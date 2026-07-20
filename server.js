@@ -50,6 +50,7 @@ app.get("/gigs", (req, res) => {
         <p><strong>Attendance:</strong> ${gig.attendance_status || "Not set"}</p>
         <p><strong>Notes:</strong> ${gig.notes || "No notes added"}</p>
         <p><a href="${gig.ticket_url}" target="_blank">Ticket link</a></p>
+        <p><a href="/edit-gig/${gig.id}">Edit Gig</a></p>
 
         <form action="/delete-gig/${gig.id}" method="POST">
           <button class="delete-button" type="submit">Delete Gig</button>
@@ -133,6 +134,208 @@ app.get("/gigs", (req, res) => {
     `);
   });
 });
+
+// Edit gig page - loads the selected gig from SQLite
+app.get("/edit-gig/:id", (req, res) => {
+  const gigId = req.params.id;
+
+  const sql = `
+    SELECT
+      gigs.id,
+      gigs.title,
+      gigs.gig_date,
+      gigs.ticket_url,
+      gigs.notes,
+      artists.name AS artist_name,
+      venues.name AS venue_name,
+      venues.city AS venue_city,
+      attendance.status AS attendance_status
+    FROM gigs
+    JOIN artists ON gigs.artist_id = artists.id
+    JOIN venues ON gigs.venue_id = venues.id
+    LEFT JOIN attendance ON attendance.gig_id = gigs.id
+    WHERE gigs.id = ?
+  `;
+
+  db.get(sql, [gigId], (err, gig) => {
+    if (err) {
+      return res.status(500).send("Database error: " + err.message);
+    }
+
+    if (!gig) {
+      return res.status(404).send("Gig not found.");
+    }
+
+    const status = gig.attendance_status || "Maybe";
+
+    res.send(`
+      <!DOCTYPE html>
+      <html lang="en">
+      <head>
+        <meta charset="UTF-8">
+        <title>Edit Gig - GigTracker</title>
+
+        <style>
+          body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            background: #f4f4f4;
+            color: #222;
+          }
+
+          nav {
+            background: #111827;
+            padding: 20px 40px;
+          }
+
+          nav a {
+            color: white;
+            text-decoration: none;
+            margin-right: 20px;
+            font-weight: bold;
+          }
+
+          .page {
+            padding: 40px;
+          }
+
+          .card {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            max-width: 600px;
+          }
+
+          label {
+            display: block;
+            margin-top: 15px;
+            margin-bottom: 5px;
+            font-weight: bold;
+          }
+
+          input,
+          select,
+          textarea {
+            width: 100%;
+            padding: 10px;
+            box-sizing: border-box;
+            margin-bottom: 10px;
+          }
+
+          textarea {
+            min-height: 100px;
+          }
+
+          button {
+            padding: 12px 20px;
+            background: #2563eb;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-weight: bold;
+            cursor: pointer;
+          }
+        </style>
+      </head>
+
+      <body>
+        <nav>
+          <a href="/">Home</a>
+          <a href="/gigs">Gigs</a>
+          <a href="/add-gig">Add Gig</a>
+          <a href="/artists">Artists</a>
+          <a href="/venues">Venues</a>
+          <a href="/login">Login</a>
+          <a href="/register">Register</a>
+        </nav>
+
+        <div class="page">
+          <div class="card">
+            <h1>Edit Gig</h1>
+
+            <form action="/edit-gig/${gig.id}" method="POST">
+              <label for="title">Gig Title</label>
+              <input
+                type="text"
+                id="title"
+                name="title"
+                value="${gig.title}"
+                required
+              >
+
+              <label for="artist">Artist</label>
+              <input
+                type="text"
+                id="artist"
+                name="artist"
+                value="${gig.artist_name}"
+                required
+              >
+
+              <label for="venue">Venue</label>
+              <input
+                type="text"
+                id="venue"
+                name="venue"
+                value="${gig.venue_name}"
+                required
+              >
+
+              <label for="city">City</label>
+              <input
+                type="text"
+                id="city"
+                name="city"
+                value="${gig.venue_city}"
+                required
+              >
+
+              <label for="gig-date">Date</label>
+              <input
+                type="date"
+                id="gig-date"
+                name="gig_date"
+                value="${gig.gig_date}"
+                required
+              >
+
+              <label for="ticket-url">Ticket Link</label>
+              <input
+                type="url"
+                id="ticket-url"
+                name="ticket_url"
+                value="${gig.ticket_url || ""}"
+              >
+
+              <label for="attendance-status">Attendance Status</label>
+              <select id="attendance-status" name="attendance_status">
+                <option value="Going" ${status === "Going" ? "selected" : ""}>
+                  Going
+                </option>
+
+                <option value="Maybe" ${status === "Maybe" ? "selected" : ""}>
+                  Maybe
+                </option>
+
+                <option value="Went" ${status === "Went" ? "selected" : ""}>
+                  Went
+                </option>
+              </select>
+
+              <label for="notes">Notes</label>
+              <textarea id="notes" name="notes">${gig.notes || ""}</textarea>
+
+              <button type="submit">Save Changes</button>
+            </form>
+          </div>
+        </div>
+      </body>
+      </html>
+    `);
+  });
+});
+
+
 
 // Add gig page
 app.get("/add-gig", (req, res) => {
