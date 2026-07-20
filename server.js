@@ -756,6 +756,7 @@ app.get("/artists", (req, res) => {
               (artist) => `
                 <section class="artist-card">
                   <h2>${artist.name}</h2>
+                  <p><a href="/edit-artist/${artist.id}">Edit Artist</a></p>
                 </section>
               `
             )
