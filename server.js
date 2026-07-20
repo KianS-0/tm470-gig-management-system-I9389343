@@ -607,9 +607,94 @@ app.post("/delete-gig/:id", (req, res) => {
   });
 });
 
-// Artists page
+// Artists page - displays artists from SQLite
 app.get("/artists", (req, res) => {
-  res.sendFile(path.join(__dirname, "artists.html"));
+  db.all(
+    "SELECT id, name FROM artists ORDER BY name ASC",
+    [],
+    (err, artists) => {
+      if (err) {
+        return res
+          .status(500)
+          .send("Database error: " + err.message);
+      }
+
+      const artistCards = artists.length
+        ? artists
+            .map(
+              (artist) => `
+                <section class="artist-card">
+                  <h2>${artist.name}</h2>
+                </section>
+              `
+            )
+            .join("")
+        : "<p>No artists found.</p>";
+
+      res.send(`
+        <!DOCTYPE html>
+        <html lang="en">
+        <head>
+          <meta charset="UTF-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <title>Artists - GigTracker</title>
+
+          <style>
+            body {
+              font-family: Arial, sans-serif;
+              margin: 0;
+              background: #f4f4f4;
+              color: #222;
+            }
+
+            nav {
+              background: #111827;
+              padding: 20px 40px;
+            }
+
+            nav a {
+              color: white;
+              text-decoration: none;
+              margin-right: 20px;
+              font-weight: bold;
+            }
+
+            main {
+              padding: 40px;
+            }
+
+            .artist-card {
+              background: white;
+              padding: 20px;
+              margin-bottom: 15px;
+              border-radius: 8px;
+              max-width: 600px;
+            }
+          </style>
+        </head>
+
+        <body>
+          <nav>
+            <a href="/">Home</a>
+            <a href="/gigs">Gigs</a>
+            <a href="/add-gig">Add Gig</a>
+            <a href="/artists">Artists</a>
+            <a href="/venues">Venues</a>
+            <a href="/login">Login</a>
+            <a href="/register">Register</a>
+          </nav>
+
+          <main>
+            <h1>Artists</h1>
+            <p>Artists stored in the SQLite database.</p>
+
+            ${artistCards}
+          </main>
+        </body>
+        </html>
+      `);
+    }
+  );
 });
 
 // Venues page
