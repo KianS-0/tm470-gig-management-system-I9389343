@@ -1019,6 +1019,294 @@ app.get("/artists", (req, res) => {
   );
 });
 
+// Add Venue page
+app.get("/add-venue", (req, res) => {
+  res.send(`
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <title>Add Venue - GigTracker</title>
+      <link rel="stylesheet" href="/styles.css">
+    </head>
+
+    <body>
+      <nav>
+        <a href="/">Home</a>
+        <a href="/gigs">Gigs</a>
+        <a href="/artists">Artists</a>
+        <a href="/venues">Venues</a>
+        <a href="/add-gig">Add Gig</a>
+        <a href="/login">Login</a>
+        <a href="/register">Register</a>
+      </nav>
+
+      <main>
+        <h1>Add Venue</h1>
+
+        <form action="/add-venue" method="POST">
+          <label for="name">Venue Name</label>
+          <input
+            type="text"
+            id="name"
+            name="name"
+            required
+          >
+
+          <label for="city">City</label>
+          <input
+            type="text"
+            id="city"
+            name="city"
+            required
+          >
+
+          <button type="submit">Add Venue</button>
+        </form>
+
+        <p><a href="/venues">Return to Venues</a></p>
+      </main>
+    </body>
+    </html>
+  `);
+});
+
+// Save a new venue to SQLite
+app.post("/add-venue", (req, res) => {
+  const name = req.body.name ? req.body.name.trim() : "";
+  const city = req.body.city ? req.body.city.trim() : "";
+
+  if (!name || !city) {
+    return res.status(400).send("Venue name and city are required.");
+  }
+
+  db.get(
+    `SELECT id FROM venues
+     WHERE LOWER(name) = LOWER(?)
+     AND LOWER(city) = LOWER(?)`,
+    [name, city],
+    (findErr, existingVenue) => {
+      if (findErr) {
+        return res
+          .status(500)
+          .send("Venue lookup error: " + findErr.message);
+      }
+
+      if (existingVenue) {
+        return res.status(400).send("This venue already exists.");
+      }
+
+      db.run(
+        "INSERT INTO venues (name, city) VALUES (?, ?)",
+        [name, city],
+        (insertErr) => {
+          if (insertErr) {
+            return res
+              .status(500)
+              .send("Venue insert error: " + insertErr.message);
+          }
+
+          res.redirect("/venues");
+        }
+      );
+    }
+  );
+});
+
+// Edit venue page
+app.get("/edit-venue/:id", (req, res) => {
+  const venueId = req.params.id;
+
+  db.get(
+    "SELECT id, name, city FROM venues WHERE id = ?",
+    [venueId],
+    (err, venue) => {
+      if (err) {
+        return res
+          .status(500)
+          .send("Database error: " + err.message);
+      }
+
+      if (!venue) {
+        return res.status(404).send("Venue not found.");
+      }
+
+      res.send(`
+        <!DOCTYPE html>
+        <html lang="en">
+        <head>
+          <meta charset="UTF-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <title>Edit Venue - GigTracker</title>
+          <link rel="stylesheet" href="/styles.css">
+        </head>
+
+        <body>
+          <nav>
+            <a href="/">Home</a>
+            <a href="/gigs">Gigs</a>
+            <a href="/artists">Artists</a>
+            <a href="/venues">Venues</a>
+            <a href="/add-gig">Add Gig</a>
+            <a href="/login">Login</a>
+            <a href="/register">Register</a>
+          </nav>
+
+          <main>
+            <h1>Edit Venue</h1>
+
+            <form action="/edit-venue/${venue.id}" method="POST">
+              <label for="name">Venue Name</label>
+              <input
+                type="text"
+                id="name"
+                name="name"
+                value="${venue.name}"
+                required
+              >
+
+              <label for="city">City</label>
+              <input
+                type="text"
+                id="city"
+                name="city"
+                value="${venue.city || ""}"
+                required
+              >
+
+              <button type="submit">Save Changes</button>
+            </form>
+
+            <p><a href="/venues">Return to Venues</a></p>
+          </main>
+        </body>
+        </html>
+      `);
+    }
+  );
+});
+
+// Save changes made to a venue
+app.post("/edit-venue/:id", (req, res) => {
+  const venueId = req.params.id;
+  const name = req.body.name ? req.body.name.trim() : "";
+  const city = req.body.city ? req.body.city.trim() : "";
+
+  if (!name || !city) {
+    return res.status(400).send("Venue name and city are required.");
+  }
+
+  db.get(
+    `SELECT id FROM venues
+     WHERE LOWER(name) = LOWER(?)
+     AND LOWER(city) = LOWER(?)
+     AND id != ?`,
+    [name, city, venueId],
+    (findErr, existingVenue) => {
+      if (findErr) {
+        return res
+          .status(500)
+          .send("Venue lookup error: " + findErr.message);
+      }
+
+      if (existingVenue) {
+        return res.status(400).send("This venue already exists.");
+      }
+
+      db.run(
+        "UPDATE venues SET name = ?, city = ? WHERE id = ?",
+        [name, city, venueId],
+        function (updateErr) {
+          if (updateErr) {
+            return res
+              .status(500)
+              .send("Venue update error: " + updateErr.message);
+          }
+
+          if (this.changes === 0) {
+            return res.status(404).send("Venue not found.");
+          }
+
+          res.redirect("/venues");
+        }
+      );
+    }
+  );
+});
+
+// Delete a venue from SQLite
+app.post("/delete-venue/:id", (req, res) => {
+  const venueId = req.params.id;
+
+  // Prevent deletion when the venue is linked to an existing gig
+  db.get(
+    "SELECT COUNT(*) AS gigCount FROM gigs WHERE venue_id = ?",
+    [venueId],
+    (countErr, row) => {
+      if (countErr) {
+        return res
+          .status(500)
+          .send("Venue lookup error: " + countErr.message);
+      }
+
+      if (row.gigCount > 0) {
+        return res.status(400).send(`
+          <!DOCTYPE html>
+          <html lang="en">
+          <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>Cannot Delete Venue - GigTracker</title>
+            <link rel="stylesheet" href="/styles.css">
+          </head>
+
+          <body>
+            <nav>
+              <a href="/">Home</a>
+              <a href="/gigs">Gigs</a>
+              <a href="/artists">Artists</a>
+              <a href="/venues">Venues</a>
+              <a href="/add-gig">Add Gig</a>
+              <a href="/login">Login</a>
+              <a href="/register">Register</a>
+            </nav>
+
+            <main>
+              <h1>Venue cannot be deleted</h1>
+
+              <div class="message">
+                <p>This venue is currently linked to one or more gigs.</p>
+                <p>Delete or edit those gigs before deleting the venue.</p>
+                <a href="/venues">Return to Venues</a>
+              </div>
+            </main>
+          </body>
+          </html>
+        `);
+      }
+
+      db.run(
+        "DELETE FROM venues WHERE id = ?",
+        [venueId],
+        function (deleteErr) {
+          if (deleteErr) {
+            return res
+              .status(500)
+              .send("Venue delete error: " + deleteErr.message);
+          }
+
+          if (this.changes === 0) {
+            return res.status(404).send("Venue not found.");
+          }
+
+          res.redirect("/venues");
+        }
+      );
+    }
+  );
+});
+
 // Venues page - displays venues from SQLite
 app.get("/venues", (req, res) => {
   db.all(
@@ -1038,6 +1326,10 @@ app.get("/venues", (req, res) => {
                 <section class="venue-card">
                   <h2>${venue.name}</h2>
                   <p><strong>City:</strong> ${venue.city || "Not specified"}</p>
+                  <p><a href="/edit-venue/${venue.id}">Edit Venue</a></p>
+                  <form action="/delete-venue/${venue.id}" method="POST">
+                    <button class="delete-button" type="submit">Delete Venue</button>
+                  </form>
                 </section>
               `
             )
@@ -1068,6 +1360,7 @@ app.get("/venues", (req, res) => {
           <main>
             <h1>Venues</h1>
             <p>View the venues currently stored in GigTracker.</p>
+            <p><a class="button" href="/add-venue">Add Venue</a></p>
 
             ${venueCards}
           </main>
