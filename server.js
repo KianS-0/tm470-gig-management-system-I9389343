@@ -1019,9 +1019,63 @@ app.get("/artists", (req, res) => {
   );
 });
 
-// Venues page
+// Venues page - displays venues from SQLite
 app.get("/venues", (req, res) => {
-  res.sendFile(path.join(__dirname, "venues.html"));
+  db.all(
+    "SELECT id, name, city FROM venues ORDER BY name COLLATE NOCASE",
+    [],
+    (err, venues) => {
+      if (err) {
+        return res
+          .status(500)
+          .send("Database error: " + err.message);
+      }
+
+      const venueCards = venues.length
+        ? venues
+            .map(
+              (venue) => `
+                <section class="venue-card">
+                  <h2>${venue.name}</h2>
+                  <p><strong>City:</strong> ${venue.city || "Not specified"}</p>
+                </section>
+              `
+            )
+            .join("")
+        : "<p>No venues found.</p>";
+
+      res.send(`
+        <!DOCTYPE html>
+        <html lang="en">
+        <head>
+          <meta charset="UTF-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <title>Venues - GigTracker</title>
+          <link rel="stylesheet" href="/styles.css">
+        </head>
+
+        <body>
+          <nav>
+            <a href="/">Home</a>
+            <a href="/gigs">Gigs</a>
+            <a href="/artists">Artists</a>
+            <a href="/venues">Venues</a>
+            <a href="/add-gig">Add Gig</a>
+            <a href="/login">Login</a>
+            <a href="/register">Register</a>
+          </nav>
+
+          <main>
+            <h1>Venues</h1>
+            <p>View the venues currently stored in GigTracker.</p>
+
+            ${venueCards}
+          </main>
+        </body>
+        </html>
+      `);
+    }
+  );
 });
 
 // Login page
