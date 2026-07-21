@@ -68,13 +68,14 @@ app.get("/gigs", (req, res) => {
           body {
             font-family: Arial, sans-serif;
             margin: 0;
+            line-height: 1.6;
             background: #f5f5f5;
             color: #222;
           }
 
           nav {
-            background: #111;
-            padding: 1rem;
+            background-color: #111827;
+            padding: 20px 40px;
           }
 
           nav a {
