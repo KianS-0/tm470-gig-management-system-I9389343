@@ -742,6 +742,187 @@ app.post("/add-artist", (req, res) => {
   );
 });
 
+// Edit artist page - loads the selected artist from SQLite
+app.get("/edit-artist/:id", (req, res) => {
+  const artistId = req.params.id;
+
+  db.get(
+    "SELECT id, name FROM artists WHERE id = ?",
+    [artistId],
+    (err, artist) => {
+      if (err) {
+        return res
+          .status(500)
+          .send("Database error: " + err.message);
+      }
+
+      if (!artist) {
+        return res.status(404).send("Artist not found.");
+      }
+
+      res.send(`
+        <!DOCTYPE html>
+        <html lang="en">
+        <head>
+          <meta charset="UTF-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <title>Edit Artist - GigTracker</title>
+          <link rel="stylesheet" href="/styles.css">
+        </head>
+
+        <body>
+          <nav>
+            <a href="/">Home</a>
+            <a href="/gigs">Gigs</a>
+            <a href="/artists">Artists</a>
+            <a href="/venues">Venues</a>
+            <a href="/add-gig">Add Gig</a>
+            <a href="/login">Login</a>
+            <a href="/register">Register</a>
+          </nav>
+
+          <main>
+            <h1>Edit Artist</h1>
+
+            <form action="/edit-artist/${artist.id}" method="POST">
+              <label for="name">Artist Name</label>
+
+              <input
+                type="text"
+                id="name"
+                name="name"
+                value="${artist.name}"
+                required
+              >
+
+              <button type="submit">Save Changes</button>
+            </form>
+
+            <p><a href="/artists">Return to Artists</a></p>
+          </main>
+        </body>
+        </html>
+      `);
+    }
+  );
+});
+
+// Save changes made to an artist
+app.post("/edit-artist/:id", (req, res) => {
+  const artistId = req.params.id;
+  const name = req.body.name ? req.body.name.trim() : "";
+
+  if (!name) {
+    return res.status(400).send("Artist name is required.");
+  }
+
+  db.get(
+    "SELECT id FROM artists WHERE LOWER(name) = LOWER(?) AND id != ?",
+    [name, artistId],
+    (findErr, existingArtist) => {
+      if (findErr) {
+        return res
+          .status(500)
+          .send("Artist lookup error: " + findErr.message);
+      }
+
+      if (existingArtist) {
+        return res.status(400).send("This artist already exists.");
+      }
+
+      db.run(
+        "UPDATE artists SET name = ? WHERE id = ?",
+        [name, artistId],
+        function (updateErr) {
+          if (updateErr) {
+            return res
+              .status(500)
+              .send("Artist update error: " + updateErr.message);
+          }
+
+          if (this.changes === 0) {
+            return res.status(404).send("Artist not found.");
+          }
+
+          res.redirect("/artists");
+        }
+      );
+    }
+  );
+});
+
+// Delete an artist from SQLite
+app.post("/delete-artist/:id", (req, res) => {
+  const artistId = req.params.id;
+
+  // Prevent deletion when the artist is linked to an existing gig
+  db.get(
+    "SELECT COUNT(*) AS gigCount FROM gigs WHERE artist_id = ?",
+    [artistId],
+    (countErr, row) => {
+      if (countErr) {
+        return res
+          .status(500)
+          .send("Artist lookup error: " + countErr.message);
+      }
+
+      if (row.gigCount > 0) {
+        return res.status(400).send(`
+          <!DOCTYPE html>
+          <html lang="en">
+          <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>Cannot Delete Artist - GigTracker</title>
+            <link rel="stylesheet" href="/styles.css">
+          </head>
+
+          <body>
+            <nav>
+              <a href="/">Home</a>
+              <a href="/gigs">Gigs</a>
+              <a href="/artists">Artists</a>
+              <a href="/venues">Venues</a>
+              <a href="/add-gig">Add Gig</a>
+              <a href="/login">Login</a>
+              <a href="/register">Register</a>
+            </nav>
+
+            <main>
+              <h1>Artist cannot be deleted</h1>
+
+              <div class="message">
+                <p>This artist is currently linked to one or more gigs.</p>
+                <p>Delete or edit those gigs before deleting the artist.</p>
+                <a href="/artists">Return to Artists</a>
+              </div>
+            </main>
+          </body>
+          </html>
+        `);
+      }
+
+      db.run(
+        "DELETE FROM artists WHERE id = ?",
+        [artistId],
+        function (deleteErr) {
+          if (deleteErr) {
+            return res
+              .status(500)
+              .send("Artist delete error: " + deleteErr.message);
+          }
+
+          if (this.changes === 0) {
+            return res.status(404).send("Artist not found.");
+          }
+
+          res.redirect("/artists");
+        }
+      );
+    }
+  );
+});
+
 // Artists page - displays artists from SQLite
 app.get("/artists", (req, res) => {
   db.all(
@@ -761,6 +942,9 @@ app.get("/artists", (req, res) => {
                 <section class="artist-card">
                   <h2>${artist.name}</h2>
                   <p><a href="/edit-artist/${artist.id}">Edit Artist</a></p>
+                  <form action="/delete-artist/${artist.id}" method="POST">
+                <button class="delete-button" type="submit">Delete Artist</button>
+              </form>
                 </section>
               `
             )
