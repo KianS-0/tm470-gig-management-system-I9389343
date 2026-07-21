@@ -113,6 +113,7 @@ app.get("/gigs", (req, res) => {
             font-weight: bold;
           }
         </style>
+<link rel="stylesheet" href="/styles.css">
       </head>
       <body>
         <nav>
@@ -237,6 +238,7 @@ app.get("/edit-gig/:id", (req, res) => {
             cursor: pointer;
           }
         </style>
+<link rel="stylesheet" href="/styles.css">
       </head>
 
       <body>
@@ -672,6 +674,7 @@ app.get("/add-artist", (req, res) => {
           cursor: pointer;
         }
       </style>
+<link rel="stylesheet" href="/styles.css">
     </head>
 
     <body>
@@ -804,6 +807,7 @@ app.get("/artists", (req, res) => {
               max-width: 600px;
             }
           </style>
+<link rel="stylesheet" href="/styles.css">
         </head>
 
         <body>

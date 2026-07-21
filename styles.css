@@ -1,0 +1,169 @@
+/* Shared styling for the GigTracker website */
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: Arial, Helvetica, sans-serif;
+  line-height: 1.6;
+  background-color: #f3f4f6;
+  color: #1f2937;
+}
+
+nav {
+  width: 100%;
+  background-color: #111827;
+  padding: 20px 40px;
+}
+
+nav a {
+  display: inline-block;
+  margin-right: 24px;
+  color: white;
+  font-weight: bold;
+  text-decoration: none;
+}
+
+nav a:hover,
+nav a:focus {
+  text-decoration: underline;
+}
+
+main,
+.content,
+.page {
+  width: min(1000px, calc(100% - 40px));
+  margin: 0 auto;
+  padding: 40px 0;
+}
+
+.hero {
+  padding: 70px 40px;
+  background-color: white;
+  text-align: center;
+}
+
+.hero h1 {
+  margin: 0 0 10px;
+  font-size: 48px;
+}
+
+.hero p {
+  max-width: 700px;
+  margin: 0 auto 30px;
+  font-size: 20px;
+}
+
+h1 {
+  margin-top: 0;
+  font-size: 36px;
+}
+
+h2 {
+  margin-top: 0;
+}
+
+.section,
+.card,
+.gig-card,
+.artist-card,
+.venue-card,
+form {
+  max-width: 760px;
+  margin-bottom: 24px;
+  padding: 28px;
+  background-color: white;
+  border: 1px solid #d1d5db;
+  border-radius: 10px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06);
+}
+
+label {
+  display: block;
+  margin: 16px 0 6px;
+  font-weight: bold;
+}
+
+input,
+select,
+textarea {
+  width: 100%;
+  padding: 11px;
+  border: 1px solid #9ca3af;
+  border-radius: 5px;
+  font: inherit;
+}
+
+textarea {
+  min-height: 110px;
+  resize: vertical;
+}
+
+button,
+.button {
+  display: inline-block;
+  margin-top: 18px;
+  padding: 11px 18px;
+  border: 0;
+  border-radius: 6px;
+  background-color: #2563eb;
+  color: white;
+  font-weight: bold;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+button:hover,
+.button:hover {
+  opacity: 0.9;
+}
+
+.delete-button {
+  background-color: #b91c1c;
+}
+
+.button-secondary {
+  background-color: #e5e7eb;
+  color: #111827;
+}
+
+.action-link {
+  display: inline-block;
+  margin-right: 16px;
+  font-weight: bold;
+}
+
+.message {
+  max-width: 760px;
+  padding: 14px;
+  border-radius: 6px;
+  background-color: white;
+  border: 1px solid #d1d5db;
+}
+
+@media (max-width: 700px) {
+  nav {
+    padding: 16px 20px;
+  }
+
+  nav a {
+    margin: 5px 14px 5px 0;
+  }
+
+  main,
+  .content,
+  .page {
+    width: min(100% - 24px, 1000px);
+    padding: 24px 0;
+  }
+
+  .hero {
+    padding: 45px 20px;
+  }
+
+  .hero h1 {
+    font-size: 38px;
+  }
+}
