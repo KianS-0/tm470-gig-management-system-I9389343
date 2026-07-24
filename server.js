@@ -524,9 +524,21 @@ app.post("/add-gig", (req, res) => {
     );
 
     db.run(
-      "INSERT INTO venues (name, city) VALUES (?, ?)",
-      [venue, city]
-    );
+  `INSERT INTO venues (name, city)
+   SELECT ?, ?
+   WHERE NOT EXISTS (
+     SELECT 1
+     FROM venues
+     WHERE LOWER(name) = LOWER(?)
+       AND LOWER(city) = LOWER(?)
+   )`,
+  [
+    venue.trim(),
+    city.trim(),
+    venue.trim(),
+    city.trim()
+  ]
+);
 
     db.get(
       "SELECT id FROM artists WHERE name = ?",
@@ -537,8 +549,12 @@ app.post("/add-gig", (req, res) => {
         }
 
         db.get(
-          "SELECT id FROM venues WHERE name = ? AND city = ? ORDER BY id DESC LIMIT 1",
-          [venue, city],
+          `SELECT id FROM venues
+ WHERE LOWER(name) = LOWER(?)
+   AND LOWER(city) = LOWER(?)
+ ORDER BY id ASC
+ LIMIT 1`,
+[venue.trim(), city.trim()],
           (venueErr, venueRow) => {
             if (venueErr) {
               return res.status(500).send("Venue database error: " + venueErr.message);
