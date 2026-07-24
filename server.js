@@ -517,6 +517,13 @@ app.post("/add-gig", (req, res) => {
     return res.status(400).send("Missing required fields.");
   }
 
+  const selectedAttendanceStatus = attendance_status || "Maybe";
+const validStatuses = ["Going", "Maybe", "Went"];
+
+if (!validStatuses.includes(selectedAttendanceStatus)) {
+  return res.status(400).send("Invalid attendance status.");
+}
+
   db.serialize(() => {
     db.run(
       "INSERT OR IGNORE INTO artists (name) VALUES (?)",
@@ -579,7 +586,7 @@ app.post("/add-gig", (req, res) => {
 
                 db.run(
                   "INSERT INTO attendance (gig_id, status) VALUES (?, ?)",
-                  [this.lastID, attendance_status || "Maybe"],
+                  [this.lastID, selectedAttendanceStatus],
                   (attendanceErr) => {
                     if (attendanceErr) {
                       return res.status(500).send("Attendance database error: " + attendanceErr.message);
