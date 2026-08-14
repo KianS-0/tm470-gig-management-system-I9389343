@@ -75,6 +75,247 @@ app.get("/", (req, res) => {
   res.sendFile(path.join(__dirname, "index.html"));
 });
 
+app.get("/dashboard", (req, res) => {
+  const userId = req.session.userId;
+
+  const statsSql = `
+    SELECT
+      (
+        SELECT COUNT(*)
+        FROM gigs
+        WHERE user_id = ?
+      ) AS total_gigs,
+
+      (
+        SELECT COUNT(*)
+        FROM gigs
+        WHERE user_id = ?
+          AND DATE(gig_date) >= DATE('now')
+      ) AS upcoming_gigs,
+
+      (
+        SELECT COUNT(*)
+        FROM gigs
+        JOIN attendance
+          ON attendance.gig_id = gigs.id
+        WHERE gigs.user_id = ?
+          AND attendance.status = 'Going'
+      ) AS going_gigs,
+
+      (
+        SELECT COUNT(*)
+        FROM user_artist_follows
+        WHERE user_id = ?
+      ) AS followed_artists,
+
+      (
+        SELECT COUNT(*)
+        FROM user_venue_follows
+        WHERE user_id = ?
+      ) AS followed_venues
+  `;
+
+  db.get(
+    statsSql,
+    [
+      userId,
+      userId,
+      userId,
+      userId,
+      userId
+    ],
+    (statsErr, stats) => {
+      if (statsErr) {
+        return res
+          .status(500)
+          .send("Database error: " + statsErr.message);
+      }
+
+      const upcomingSql = `
+        SELECT
+          gigs.id,
+          gigs.title,
+          gigs.gig_date,
+          artists.name AS artist_name,
+          venues.name AS venue_name,
+          venues.city AS venue_city,
+          attendance.status AS attendance_status
+        FROM gigs
+        JOIN artists
+          ON artists.id = gigs.artist_id
+        JOIN venues
+          ON venues.id = gigs.venue_id
+        LEFT JOIN attendance
+          ON attendance.gig_id = gigs.id
+        WHERE gigs.user_id = ?
+          AND DATE(gigs.gig_date) >= DATE('now')
+        ORDER BY gigs.gig_date ASC
+        LIMIT 5
+      `;
+
+      db.all(
+        upcomingSql,
+        [userId],
+        (upcomingErr, upcomingGigs) => {
+          if (upcomingErr) {
+            return res
+              .status(500)
+              .send(
+                "Database error: " +
+                upcomingErr.message
+              );
+          }
+
+          const escapeHtml = (value) =>
+            String(value || "")
+              .replaceAll("&", "&amp;")
+              .replaceAll("<", "&lt;")
+              .replaceAll(">", "&gt;")
+              .replaceAll('"', "&quot;")
+              .replaceAll("'", "&#039;");
+
+          const upcomingCards =
+            upcomingGigs.length
+              ? upcomingGigs
+                  .map(
+                    (gig) => `
+                      <section class="gig-card">
+                        <h3>
+                          ${escapeHtml(gig.title)}
+                        </h3>
+
+                        <p>
+                          <strong>Artist:</strong>
+                          ${escapeHtml(
+                            gig.artist_name
+                          )}
+                        </p>
+
+                        <p>
+                          <strong>Venue:</strong>
+                          ${escapeHtml(
+                            gig.venue_name
+                          )},
+                          ${escapeHtml(
+                            gig.venue_city ||
+                            "Not specified"
+                          )}
+                        </p>
+
+                        <p>
+                          <strong>Date:</strong>
+                          ${escapeHtml(
+                            gig.gig_date
+                          )}
+                        </p>
+
+                        <p>
+                          <strong>Attendance:</strong>
+                          ${escapeHtml(
+                            gig.attendance_status ||
+                            "Not set"
+                          )}
+                        </p>
+
+                        <p>
+                          <a href="/edit-gig/${gig.id}">
+                            View / Edit Gig
+                          </a>
+                        </p>
+                      </section>
+                    `
+                  )
+                  .join("")
+              : `
+                <p>
+                  You currently have no upcoming gigs.
+                </p>
+              `;
+
+          res.send(`
+            <!DOCTYPE html>
+            <html lang="en">
+
+            <head>
+              <meta charset="UTF-8">
+
+              <meta
+                name="viewport"
+                content="width=device-width, initial-scale=1.0"
+              >
+
+              <title>
+                Dashboard - GigTracker
+              </title>
+
+              <link
+                rel="stylesheet"
+                href="/styles.css"
+              >
+            </head>
+
+            <body>
+              <nav>
+                <a href="/">Home</a>
+                <a href="/dashboard">Dashboard</a>
+                <a href="/gigs">Gigs</a>
+                <a href="/add-gig">Add Gig</a>
+                <a href="/artists">Artists</a>
+                <a href="/venues">Venues</a>
+              </nav>
+
+              <main>
+                <h1>Dashboard</h1>
+
+                <p>
+                  Welcome,
+                  ${escapeHtml(
+                    req.session.userName
+                  )}.
+                </p>
+
+                <section class="gig-card">
+                  <h2>Your GigTracker Summary</h2>
+
+                  <p>
+                    <strong>Total gigs:</strong>
+                    ${stats.total_gigs}
+                  </p>
+
+                  <p>
+                    <strong>Upcoming gigs:</strong>
+                    ${stats.upcoming_gigs}
+                  </p>
+
+                  <p>
+                    <strong>Marked Going:</strong>
+                    ${stats.going_gigs}
+                  </p>
+
+                  <p>
+                    <strong>Followed artists:</strong>
+                    ${stats.followed_artists}
+                  </p>
+
+                  <p>
+                    <strong>Followed venues:</strong>
+                    ${stats.followed_venues}
+                  </p>
+                </section>
+
+                <h2>Next Upcoming Gigs</h2>
+
+                ${upcomingCards}
+              </main>
+            </body>
+            </html>
+          `);
+        }
+      );
+    }
+  );
+});
+
 // Gigs page - reads gig data from SQLite and displays it as HTML
 app.get("/gigs", (req, res) => {
   const search = req.query.search
@@ -357,6 +598,7 @@ app.get("/gigs", (req, res) => {
         <body>
           <nav>
             <a href="/">Home</a>
+            <a href="/dashboard">Dashboard</a>
             <a href="/gigs">Gigs</a>
             <a href="/add-gig">Add Gig</a>
             <a href="/artists">Artists</a>
@@ -773,6 +1015,7 @@ app.get("/edit-gig/:id", (req, res) => {
       <body>
         <nav>
           <a href="/">Home</a>
+          <a href="/dashboard">Dashboard</a>
           <a href="/gigs">Gigs</a>
           <a href="/add-gig">Add Gig</a>
           <a href="/artists">Artists</a>
@@ -1315,6 +1558,7 @@ app.get("/add-artist", (req, res) => {
     <body>
       <nav>
         <a href="/">Home</a>
+        <a href="/dashboard">Dashboard</a>
         <a href="/gigs">Gigs</a>
         <a href="/add-gig">Add Gig</a>
         <a href="/artists">Artists</a>
@@ -1408,6 +1652,7 @@ app.get("/edit-artist/:id", (req, res) => {
         <body>
           <nav>
             <a href="/">Home</a>
+            <a href="/dashboard">Dashboard</a>
             <a href="/gigs">Gigs</a>
             <a href="/artists">Artists</a>
             <a href="/venues">Venues</a>
@@ -1515,6 +1760,7 @@ app.post("/delete-artist/:id", (req, res) => {
           <body>
             <nav>
               <a href="/">Home</a>
+              <a href="/dashboard">Dashboard</a>
               <a href="/gigs">Gigs</a>
               <a href="/artists">Artists</a>
               <a href="/venues">Venues</a>
@@ -1642,6 +1888,7 @@ app.get("/artists", (req, res) => {
         <body>
           <nav>
             <a href="/">Home</a>
+            <a href="/dashboard">Dashboard</a>
             <a href="/gigs">Gigs</a>
             <a href="/add-gig">Add Gig</a>
             <a href="/artists">Artists</a>
@@ -1740,6 +1987,7 @@ app.get("/add-venue", (req, res) => {
     <body>
       <nav>
         <a href="/">Home</a>
+        <a href="/dashboard">Dashboard</a>
         <a href="/gigs">Gigs</a>
         <a href="/artists">Artists</a>
         <a href="/venues">Venues</a>
@@ -1851,6 +2099,7 @@ app.get("/edit-venue/:id", (req, res) => {
         <body>
           <nav>
             <a href="/">Home</a>
+            <a href="/dashboard">Dashboard</a>
             <a href="/gigs">Gigs</a>
             <a href="/artists">Artists</a>
             <a href="/venues">Venues</a>
@@ -1970,6 +2219,7 @@ app.post("/delete-venue/:id", (req, res) => {
           <body>
             <nav>
               <a href="/">Home</a>
+              <a href="/dashboard">Dashboard</a>
               <a href="/gigs">Gigs</a>
               <a href="/artists">Artists</a>
               <a href="/venues">Venues</a>
@@ -2106,6 +2356,7 @@ app.get("/venues", (req, res) => {
         <body>
           <nav>
             <a href="/">Home</a>
+            <a href="/dashboard">Dashboard</a>
             <a href="/gigs">Gigs</a>
             <a href="/artists">Artists</a>
             <a href="/venues">Venues</a>
