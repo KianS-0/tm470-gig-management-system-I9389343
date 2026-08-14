@@ -18,6 +18,27 @@ const db = new sqlite3.Database("gigtracker.db", (err) => {
     }
 
     console.log("Foreign key enforcement enabled.");
+
+    db.run(
+      `CREATE TABLE IF NOT EXISTS users (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        email TEXT NOT NULL UNIQUE,
+        password_hash TEXT NOT NULL,
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP
+      )`,
+      (userTableErr) => {
+        if (userTableErr) {
+          console.error(
+            "Could not create users table:",
+            userTableErr.message
+          );
+          return;
+        }
+
+        console.log("Users table ready.");
+      }
+    );
   });
 });
 
