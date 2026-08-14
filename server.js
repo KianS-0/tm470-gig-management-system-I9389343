@@ -1365,9 +1365,14 @@ app.post("/edit-gig/:id", (req, res) => {
                   updateGig(artistId, venueRow.id);
                 } else {
                   db.run(
-                    `INSERT INTO venues (name, city)
-                     VALUES (?, ?)`,
-                    [venue.trim(), city.trim()],
+  `INSERT INTO venues
+   (name, city, created_by_user_id)
+   VALUES (?, ?, ?)`,
+  [
+    venue.trim(),
+    city.trim(),
+    req.session.userId
+  ],
                     function (venueInsertErr) {
                       if (venueInsertErr) {
                         return res
@@ -1390,8 +1395,10 @@ app.post("/edit-gig/:id", (req, res) => {
             continueWithArtist(artistRow.id);
           } else {
             db.run(
-              "INSERT INTO artists (name) VALUES (?)",
-              [artist.trim()],
+  `INSERT INTO artists
+   (name, created_by_user_id)
+   VALUES (?, ?)`,
+  [artist.trim(), req.session.userId],
               function (artistInsertErr) {
                 if (artistInsertErr) {
                   return res
@@ -1453,15 +1460,18 @@ if (ticket_url) {
   }
 }
 
-  db.serialize(() => {
-    db.run(
-      "INSERT OR IGNORE INTO artists (name) VALUES (?)",
-      [artist]
-    );
+db.serialize(() => {
+  db.run(
+  `INSERT OR IGNORE INTO artists
+   (name, created_by_user_id)
+   VALUES (?, ?)`,
+  [artist.trim(), req.session.userId]
+);
 
     db.run(
-  `INSERT INTO venues (name, city)
-   SELECT ?, ?
+  `INSERT INTO venues
+   (name, city, created_by_user_id)
+   SELECT ?, ?, ?
    WHERE NOT EXISTS (
      SELECT 1
      FROM venues
@@ -1471,14 +1481,15 @@ if (ticket_url) {
   [
     venue.trim(),
     city.trim(),
+    req.session.userId,
     venue.trim(),
     city.trim()
   ]
 );
 
     db.get(
-      "SELECT id FROM artists WHERE name = ?",
-      [artist],
+  "SELECT id FROM artists WHERE LOWER(name) = LOWER(?)",
+  [artist.trim()],
       (artistErr, artistRow) => {
         if (artistErr) {
           return res.status(500).send("Artist database error: " + artistErr.message);
@@ -1711,8 +1722,9 @@ app.post("/add-artist", (req, res) => {
       }
 
       db.run(
-        "INSERT INTO artists (name) VALUES (?)",
-        [name],
+          `INSERT INTO artists (name, created_by_user_id)
+          VALUES (?, ?)`,
+          [name, req.session.userId],
         (insertErr) => {
           if (insertErr) {
             return res
@@ -1727,13 +1739,16 @@ app.post("/add-artist", (req, res) => {
   );
 });
 
-// Edit artist page - loads the selected artist from SQLite
+// Edit artist page - only the creator can edit the artist
 app.get("/edit-artist/:id", (req, res) => {
   const artistId = req.params.id;
 
   db.get(
-    "SELECT id, name FROM artists WHERE id = ?",
-    [artistId],
+    `SELECT id, name
+     FROM artists
+     WHERE id = ?
+       AND created_by_user_id = ?`,
+    [artistId, req.session.userId],
     (err, artist) => {
       if (err) {
         return res
@@ -1745,12 +1760,23 @@ app.get("/edit-artist/:id", (req, res) => {
         return res.status(404).send("Artist not found.");
       }
 
+      const escapeHtml = (value) =>
+        String(value || "")
+          .replaceAll("&", "&amp;")
+          .replaceAll("<", "&lt;")
+          .replaceAll(">", "&gt;")
+          .replaceAll('"', "&quot;")
+          .replaceAll("'", "&#039;");
+
       res.send(`
         <!DOCTYPE html>
         <html lang="en">
         <head>
           <meta charset="UTF-8">
-          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <meta
+            name="viewport"
+            content="width=device-width, initial-scale=1.0"
+          >
           <title>Edit Artist - GigTracker</title>
           <link rel="stylesheet" href="/styles.css">
         </head>
@@ -1763,28 +1789,35 @@ app.get("/edit-artist/:id", (req, res) => {
             <a href="/artists">Artists</a>
             <a href="/venues">Venues</a>
             <a href="/add-gig">Add Gig</a>
-            <a href="/login">Login</a>
-            <a href="/register">Register</a>
           </nav>
 
           <main>
             <h1>Edit Artist</h1>
 
-            <form action="/edit-artist/${artist.id}" method="POST">
+            <form
+              action="/edit-artist/${artist.id}"
+              method="POST"
+            >
               <label for="name">Artist Name</label>
 
               <input
                 type="text"
                 id="name"
                 name="name"
-                value="${artist.name}"
+                value="${escapeHtml(artist.name)}"
                 required
               >
 
-              <button type="submit">Save Changes</button>
+              <button type="submit">
+                Save Changes
+              </button>
             </form>
 
-            <p><a href="/artists">Return to Artists</a></p>
+            <p>
+              <a href="/artists">
+                Return to Artists
+              </a>
+            </p>
           </main>
         </body>
         </html>
@@ -1793,117 +1826,200 @@ app.get("/edit-artist/:id", (req, res) => {
   );
 });
 
-// Save changes made to an artist
+// Save changes made to an artist - creator only
 app.post("/edit-artist/:id", (req, res) => {
   const artistId = req.params.id;
-  const name = req.body.name ? req.body.name.trim() : "";
+  const name = req.body.name
+    ? req.body.name.trim()
+    : "";
 
   if (!name) {
-    return res.status(400).send("Artist name is required.");
+    return res
+      .status(400)
+      .send("Artist name is required.");
   }
 
+  // Confirm that this artist belongs to the logged-in user
   db.get(
-    "SELECT id FROM artists WHERE LOWER(name) = LOWER(?) AND id != ?",
-    [name, artistId],
-    (findErr, existingArtist) => {
-      if (findErr) {
+    `SELECT id
+     FROM artists
+     WHERE id = ?
+       AND created_by_user_id = ?`,
+    [artistId, req.session.userId],
+    (ownershipErr, artist) => {
+      if (ownershipErr) {
         return res
           .status(500)
-          .send("Artist lookup error: " + findErr.message);
+          .send(
+            "Artist ownership check error: " +
+              ownershipErr.message
+          );
       }
 
-      if (existingArtist) {
-        return res.status(400).send("This artist already exists.");
+      if (!artist) {
+        return res.status(404).send("Artist not found.");
       }
 
-      db.run(
-        "UPDATE artists SET name = ? WHERE id = ?",
-        [name, artistId],
-        function (updateErr) {
-          if (updateErr) {
+      // Do not rename an artist used by another user's gig
+      db.get(
+        `SELECT COUNT(*) AS otherUserGigCount
+         FROM gigs
+         WHERE artist_id = ?
+           AND user_id != ?`,
+        [artistId, req.session.userId],
+        (usageErr, usageRow) => {
+          if (usageErr) {
             return res
               .status(500)
-              .send("Artist update error: " + updateErr.message);
+              .send(
+                "Artist usage check error: " +
+                  usageErr.message
+              );
           }
 
-          if (this.changes === 0) {
-            return res.status(404).send("Artist not found.");
+          if (usageRow.otherUserGigCount > 0) {
+            return res
+              .status(400)
+              .send(
+                "This artist is used by another user's gig and cannot be renamed."
+              );
           }
 
-          res.redirect("/artists");
+          db.get(
+            `SELECT id
+             FROM artists
+             WHERE LOWER(name) = LOWER(?)
+               AND id != ?`,
+            [name, artistId],
+            (findErr, existingArtist) => {
+              if (findErr) {
+                return res
+                  .status(500)
+                  .send(
+                    "Artist lookup error: " +
+                      findErr.message
+                  );
+              }
+
+              if (existingArtist) {
+                return res
+                  .status(400)
+                  .send("This artist already exists.");
+              }
+
+              db.run(
+                `UPDATE artists
+                 SET name = ?
+                 WHERE id = ?
+                   AND created_by_user_id = ?`,
+                [
+                  name,
+                  artistId,
+                  req.session.userId
+                ],
+                function (updateErr) {
+                  if (updateErr) {
+                    return res
+                      .status(500)
+                      .send(
+                        "Artist update error: " +
+                          updateErr.message
+                      );
+                  }
+
+                  if (this.changes === 0) {
+                    return res
+                      .status(404)
+                      .send("Artist not found.");
+                  }
+
+                  res.redirect("/artists");
+                }
+              );
+            }
+          );
         }
       );
     }
   );
 });
 
-// Delete an artist from SQLite
+// Delete an artist from SQLite - creator only
 app.post("/delete-artist/:id", (req, res) => {
   const artistId = req.params.id;
 
-  // Prevent deletion when the artist is linked to an existing gig
+  // Confirm that the artist belongs to the logged-in user
   db.get(
-    "SELECT COUNT(*) AS gigCount FROM gigs WHERE artist_id = ?",
-    [artistId],
-    (countErr, row) => {
-      if (countErr) {
+    `SELECT id
+     FROM artists
+     WHERE id = ?
+       AND created_by_user_id = ?`,
+    [artistId, req.session.userId],
+    (ownershipErr, artist) => {
+      if (ownershipErr) {
         return res
           .status(500)
-          .send("Artist lookup error: " + countErr.message);
+          .send(
+            "Artist ownership check error: " +
+              ownershipErr.message
+          );
       }
 
-      if (row.gigCount > 0) {
-        return res.status(400).send(`
-          <!DOCTYPE html>
-          <html lang="en">
-          <head>
-            <meta charset="UTF-8">
-            <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <title>Cannot Delete Artist - GigTracker</title>
-            <link rel="stylesheet" href="/styles.css">
-          </head>
-
-          <body>
-            <nav>
-              <a href="/">Home</a>
-              <a href="/dashboard">Dashboard</a>
-              <a href="/gigs">Gigs</a>
-              <a href="/artists">Artists</a>
-              <a href="/venues">Venues</a>
-              <a href="/add-gig">Add Gig</a>
-              <a href="/login">Login</a>
-              <a href="/register">Register</a>
-            </nav>
-
-            <main>
-              <h1>Artist cannot be deleted</h1>
-
-              <div class="message">
-                <p>This artist is currently linked to one or more gigs.</p>
-                <p>Delete or edit those gigs before deleting the artist.</p>
-                <a href="/artists">Return to Artists</a>
-              </div>
-            </main>
-          </body>
-          </html>
-        `);
+      if (!artist) {
+        return res.status(404).send("Artist not found.");
       }
 
-      db.run(
-        "DELETE FROM artists WHERE id = ?",
+      // Do not delete an artist that is still used by a gig
+      db.get(
+        `SELECT COUNT(*) AS gigCount
+         FROM gigs
+         WHERE artist_id = ?`,
         [artistId],
-        function (deleteErr) {
-          if (deleteErr) {
+        (countErr, row) => {
+          if (countErr) {
             return res
               .status(500)
-              .send("Artist delete error: " + deleteErr.message);
+              .send(
+                "Artist lookup error: " +
+                  countErr.message
+              );
           }
 
-          if (this.changes === 0) {
-            return res.status(404).send("Artist not found.");
+          if (row.gigCount > 0) {
+            return res
+              .status(400)
+              .send(
+                "This artist is linked to one or more gigs and cannot be deleted."
+              );
           }
 
-          res.redirect("/artists");
+          db.run(
+            `DELETE FROM artists
+             WHERE id = ?
+               AND created_by_user_id = ?`,
+            [
+              artistId,
+              req.session.userId
+            ],
+            function (deleteErr) {
+              if (deleteErr) {
+                return res
+                  .status(500)
+                  .send(
+                    "Artist delete error: " +
+                      deleteErr.message
+                  );
+              }
+
+              if (this.changes === 0) {
+                return res
+                  .status(404)
+                  .send("Artist not found.");
+              }
+
+              res.redirect("/artists");
+            }
+          );
         }
       );
     }
@@ -1916,6 +2032,7 @@ app.get("/artists", (req, res) => {
     `SELECT
        artists.id,
        artists.name,
+       artists.created_by_user_id,
        CASE
          WHEN user_artist_follows.user_id IS NULL THEN 0
          ELSE 1
@@ -1924,7 +2041,7 @@ app.get("/artists", (req, res) => {
      LEFT JOIN user_artist_follows
        ON user_artist_follows.artist_id = artists.id
        AND user_artist_follows.user_id = ?
-     ORDER BY artists.name ASC`,
+     ORDER BY artists.name COLLATE NOCASE`,
     [req.session.userId],
     (err, artists) => {
       if (err) {
@@ -1933,45 +2050,74 @@ app.get("/artists", (req, res) => {
           .send("Database error: " + err.message);
       }
 
+      const escapeHtml = (value) =>
+        String(value || "")
+          .replaceAll("&", "&amp;")
+          .replaceAll("<", "&lt;")
+          .replaceAll(">", "&gt;")
+          .replaceAll('"', "&quot;")
+          .replaceAll("'", "&#039;");
+
       const artistCards = artists.length
         ? artists
             .map((artist) => {
               const followSection = artist.is_followed
                 ? `
                   <p><strong>Following</strong></p>
-                  <form action="/unfollow-artist/${artist.id}" method="POST">
-                    <button type="submit">Unfollow</button>
+
+                  <form
+                    action="/unfollow-artist/${artist.id}"
+                    method="POST"
+                  >
+                    <button type="submit">
+                      Unfollow
+                    </button>
                   </form>
                 `
                 : `
-                  <form action="/follow-artist/${artist.id}" method="POST">
-                    <button type="submit">Follow</button>
+                  <form
+                    action="/follow-artist/${artist.id}"
+                    method="POST"
+                  >
+                    <button type="submit">
+                      Follow
+                    </button>
                   </form>
                 `;
 
+              const managementSection =
+                artist.created_by_user_id ===
+                req.session.userId
+                  ? `
+                    <p>
+                      <a href="/edit-artist/${artist.id}">
+                        Edit Artist
+                      </a>
+                    </p>
+
+                    <form
+                      action="/delete-artist/${artist.id}"
+                      method="POST"
+                    >
+                      <button
+                        class="delete-button"
+                        type="submit"
+                      >
+                        Delete Artist
+                      </button>
+                    </form>
+                  `
+                  : "";
+
               return `
                 <section class="artist-card">
-                  <h2>${artist.name}</h2>
+                  <h2>
+                    ${escapeHtml(artist.name)}
+                  </h2>
 
                   ${followSection}
 
-                  <p>
-                    <a href="/edit-artist/${artist.id}">
-                      Edit Artist
-                    </a>
-                  </p>
-
-                  <form
-                    action="/delete-artist/${artist.id}"
-                    method="POST"
-                  >
-                    <button
-                      class="delete-button"
-                      type="submit"
-                    >
-                      Delete Artist
-                    </button>
-                  </form>
+                  ${managementSection}
                 </section>
               `;
             })
@@ -1983,10 +2129,12 @@ app.get("/artists", (req, res) => {
         <html lang="en">
         <head>
           <meta charset="UTF-8">
+
           <meta
             name="viewport"
             content="width=device-width, initial-scale=1.0"
           >
+
           <title>Artists - GigTracker</title>
           <link rel="stylesheet" href="/styles.css">
         </head>
@@ -1999,18 +2147,19 @@ app.get("/artists", (req, res) => {
             <a href="/add-gig">Add Gig</a>
             <a href="/artists">Artists</a>
             <a href="/venues">Venues</a>
-            <a href="/login">Login</a>
-            <a href="/register">Register</a>
           </nav>
 
           <main>
             <h1>Artists</h1>
+
             <p>
               Browse, manage and follow artists in your collection.
             </p>
 
             <p>
-              <a href="/add-artist">Add Artist</a>
+              <a href="/add-artist">
+                Add Artist
+              </a>
             </p>
 
             ${artistCards}
@@ -2158,8 +2307,9 @@ app.post("/add-venue", (req, res) => {
       }
 
       db.run(
-        "INSERT INTO venues (name, city) VALUES (?, ?)",
-        [name, city],
+  `INSERT INTO venues (name, city, created_by_user_id)
+   VALUES (?, ?, ?)`,
+  [name, city, req.session.userId],
         (insertErr) => {
           if (insertErr) {
             return res
@@ -2174,13 +2324,16 @@ app.post("/add-venue", (req, res) => {
   );
 });
 
-// Edit venue page
+// Edit venue page - only the creator can edit the venue
 app.get("/edit-venue/:id", (req, res) => {
   const venueId = req.params.id;
 
   db.get(
-    "SELECT id, name, city FROM venues WHERE id = ?",
-    [venueId],
+    `SELECT id, name, city
+     FROM venues
+     WHERE id = ?
+       AND created_by_user_id = ?`,
+    [venueId, req.session.userId],
     (err, venue) => {
       if (err) {
         return res
@@ -2192,12 +2345,23 @@ app.get("/edit-venue/:id", (req, res) => {
         return res.status(404).send("Venue not found.");
       }
 
+      const escapeHtml = (value) =>
+        String(value || "")
+          .replaceAll("&", "&amp;")
+          .replaceAll("<", "&lt;")
+          .replaceAll(">", "&gt;")
+          .replaceAll('"', "&quot;")
+          .replaceAll("'", "&#039;");
+
       res.send(`
         <!DOCTYPE html>
         <html lang="en">
         <head>
           <meta charset="UTF-8">
-          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <meta
+            name="viewport"
+            content="width=device-width, initial-scale=1.0"
+          >
           <title>Edit Venue - GigTracker</title>
           <link rel="stylesheet" href="/styles.css">
         </head>
@@ -2210,36 +2374,45 @@ app.get("/edit-venue/:id", (req, res) => {
             <a href="/artists">Artists</a>
             <a href="/venues">Venues</a>
             <a href="/add-gig">Add Gig</a>
-            <a href="/login">Login</a>
-            <a href="/register">Register</a>
           </nav>
 
           <main>
             <h1>Edit Venue</h1>
 
-            <form action="/edit-venue/${venue.id}" method="POST">
+            <form
+              action="/edit-venue/${venue.id}"
+              method="POST"
+            >
               <label for="name">Venue Name</label>
+
               <input
                 type="text"
                 id="name"
                 name="name"
-                value="${venue.name}"
+                value="${escapeHtml(venue.name)}"
                 required
               >
 
               <label for="city">City</label>
+
               <input
                 type="text"
                 id="city"
                 name="city"
-                value="${venue.city || ""}"
+                value="${escapeHtml(venue.city)}"
                 required
               >
 
-              <button type="submit">Save Changes</button>
+              <button type="submit">
+                Save Changes
+              </button>
             </form>
 
-            <p><a href="/venues">Return to Venues</a></p>
+            <p>
+              <a href="/venues">
+                Return to Venues
+              </a>
+            </p>
           </main>
         </body>
         </html>
@@ -2248,121 +2421,206 @@ app.get("/edit-venue/:id", (req, res) => {
   );
 });
 
-// Save changes made to a venue
+// Save changes made to a venue - creator only
 app.post("/edit-venue/:id", (req, res) => {
   const venueId = req.params.id;
-  const name = req.body.name ? req.body.name.trim() : "";
-  const city = req.body.city ? req.body.city.trim() : "";
+  const name = req.body.name
+    ? req.body.name.trim()
+    : "";
+  const city = req.body.city
+    ? req.body.city.trim()
+    : "";
 
   if (!name || !city) {
-    return res.status(400).send("Venue name and city are required.");
+    return res
+      .status(400)
+      .send("Venue name and city are required.");
   }
 
+  // Confirm that this venue belongs to the logged-in user
   db.get(
-    `SELECT id FROM venues
-     WHERE LOWER(name) = LOWER(?)
-     AND LOWER(city) = LOWER(?)
-     AND id != ?`,
-    [name, city, venueId],
-    (findErr, existingVenue) => {
-      if (findErr) {
+    `SELECT id
+     FROM venues
+     WHERE id = ?
+       AND created_by_user_id = ?`,
+    [venueId, req.session.userId],
+    (ownershipErr, venue) => {
+      if (ownershipErr) {
         return res
           .status(500)
-          .send("Venue lookup error: " + findErr.message);
+          .send(
+            "Venue ownership check error: " +
+              ownershipErr.message
+          );
       }
 
-      if (existingVenue) {
-        return res.status(400).send("This venue already exists.");
+      if (!venue) {
+        return res.status(404).send("Venue not found.");
       }
 
-      db.run(
-        "UPDATE venues SET name = ?, city = ? WHERE id = ?",
-        [name, city, venueId],
-        function (updateErr) {
-          if (updateErr) {
+      // Do not rename a venue used by another user's gig
+      db.get(
+        `SELECT COUNT(*) AS otherUserGigCount
+         FROM gigs
+         WHERE venue_id = ?
+           AND user_id != ?`,
+        [venueId, req.session.userId],
+        (usageErr, usageRow) => {
+          if (usageErr) {
             return res
               .status(500)
-              .send("Venue update error: " + updateErr.message);
+              .send(
+                "Venue usage check error: " +
+                  usageErr.message
+              );
           }
 
-          if (this.changes === 0) {
-            return res.status(404).send("Venue not found.");
+          if (usageRow.otherUserGigCount > 0) {
+            return res
+              .status(400)
+              .send(
+                "This venue is used by another user's gig and cannot be renamed."
+              );
           }
 
-          res.redirect("/venues");
+          db.get(
+            `SELECT id
+             FROM venues
+             WHERE LOWER(name) = LOWER(?)
+               AND LOWER(city) = LOWER(?)
+               AND id != ?`,
+            [name, city, venueId],
+            (findErr, existingVenue) => {
+              if (findErr) {
+                return res
+                  .status(500)
+                  .send(
+                    "Venue lookup error: " +
+                      findErr.message
+                  );
+              }
+
+              if (existingVenue) {
+                return res
+                  .status(400)
+                  .send("This venue already exists.");
+              }
+
+              db.run(
+                `UPDATE venues
+                 SET name = ?,
+                     city = ?
+                 WHERE id = ?
+                   AND created_by_user_id = ?`,
+                [
+                  name,
+                  city,
+                  venueId,
+                  req.session.userId
+                ],
+                function (updateErr) {
+                  if (updateErr) {
+                    return res
+                      .status(500)
+                      .send(
+                        "Venue update error: " +
+                          updateErr.message
+                      );
+                  }
+
+                  if (this.changes === 0) {
+                    return res
+                      .status(404)
+                      .send("Venue not found.");
+                  }
+
+                  res.redirect("/venues");
+                }
+              );
+            }
+          );
         }
       );
     }
   );
 });
 
-// Delete a venue from SQLite
+// Delete a venue from SQLite - creator only
 app.post("/delete-venue/:id", (req, res) => {
   const venueId = req.params.id;
 
-  // Prevent deletion when the venue is linked to an existing gig
+  // Confirm that the venue belongs to the logged-in user
   db.get(
-    "SELECT COUNT(*) AS gigCount FROM gigs WHERE venue_id = ?",
-    [venueId],
-    (countErr, row) => {
-      if (countErr) {
+    `SELECT id
+     FROM venues
+     WHERE id = ?
+       AND created_by_user_id = ?`,
+    [venueId, req.session.userId],
+    (ownershipErr, venue) => {
+      if (ownershipErr) {
         return res
           .status(500)
-          .send("Venue lookup error: " + countErr.message);
+          .send(
+            "Venue ownership check error: " +
+              ownershipErr.message
+          );
       }
 
-      if (row.gigCount > 0) {
-        return res.status(400).send(`
-          <!DOCTYPE html>
-          <html lang="en">
-          <head>
-            <meta charset="UTF-8">
-            <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <title>Cannot Delete Venue - GigTracker</title>
-            <link rel="stylesheet" href="/styles.css">
-          </head>
-
-          <body>
-            <nav>
-              <a href="/">Home</a>
-              <a href="/dashboard">Dashboard</a>
-              <a href="/gigs">Gigs</a>
-              <a href="/artists">Artists</a>
-              <a href="/venues">Venues</a>
-              <a href="/add-gig">Add Gig</a>
-              <a href="/login">Login</a>
-              <a href="/register">Register</a>
-            </nav>
-
-            <main>
-              <h1>Venue cannot be deleted</h1>
-
-              <div class="message">
-                <p>This venue is currently linked to one or more gigs.</p>
-                <p>Delete or edit those gigs before deleting the venue.</p>
-                <a href="/venues">Return to Venues</a>
-              </div>
-            </main>
-          </body>
-          </html>
-        `);
+      if (!venue) {
+        return res.status(404).send("Venue not found.");
       }
 
-      db.run(
-        "DELETE FROM venues WHERE id = ?",
+      // Do not delete a venue that is still used by a gig
+      db.get(
+        `SELECT COUNT(*) AS gigCount
+         FROM gigs
+         WHERE venue_id = ?`,
         [venueId],
-        function (deleteErr) {
-          if (deleteErr) {
+        (countErr, row) => {
+          if (countErr) {
             return res
               .status(500)
-              .send("Venue delete error: " + deleteErr.message);
+              .send(
+                "Venue lookup error: " +
+                  countErr.message
+              );
           }
 
-          if (this.changes === 0) {
-            return res.status(404).send("Venue not found.");
+          if (row.gigCount > 0) {
+            return res
+              .status(400)
+              .send(
+                "This venue is linked to one or more gigs and cannot be deleted."
+              );
           }
 
-          res.redirect("/venues");
+          db.run(
+            `DELETE FROM venues
+             WHERE id = ?
+               AND created_by_user_id = ?`,
+            [
+              venueId,
+              req.session.userId
+            ],
+            function (deleteErr) {
+              if (deleteErr) {
+                return res
+                  .status(500)
+                  .send(
+                    "Venue delete error: " +
+                      deleteErr.message
+                  );
+              }
+
+              if (this.changes === 0) {
+                return res
+                  .status(404)
+                  .send("Venue not found.");
+              }
+
+              res.redirect("/venues");
+            }
+          );
         }
       );
     }
@@ -2376,6 +2634,7 @@ app.get("/venues", (req, res) => {
        venues.id,
        venues.name,
        venues.city,
+       venues.created_by_user_id,
        CASE
          WHEN user_venue_follows.user_id IS NULL THEN 0
          ELSE 1
@@ -2393,6 +2652,14 @@ app.get("/venues", (req, res) => {
           .send("Database error: " + err.message);
       }
 
+      const escapeHtml = (value) =>
+        String(value || "")
+          .replaceAll("&", "&amp;")
+          .replaceAll("<", "&lt;")
+          .replaceAll(">", "&gt;")
+          .replaceAll('"', "&quot;")
+          .replaceAll("'", "&#039;");
+
       const venueCards = venues.length
         ? venues
             .map((venue) => {
@@ -2400,44 +2667,66 @@ app.get("/venues", (req, res) => {
                 ? `
                   <p><strong>Following</strong></p>
 
-                  <form action="/unfollow-venue/${venue.id}" method="POST">
-                    <button type="submit">Unfollow</button>
+                  <form
+                    action="/unfollow-venue/${venue.id}"
+                    method="POST"
+                  >
+                    <button type="submit">
+                      Unfollow
+                    </button>
                   </form>
                 `
                 : `
-                  <form action="/follow-venue/${venue.id}" method="POST">
-                    <button type="submit">Follow</button>
+                  <form
+                    action="/follow-venue/${venue.id}"
+                    method="POST"
+                  >
+                    <button type="submit">
+                      Follow
+                    </button>
                   </form>
                 `;
 
+              const managementSection =
+                venue.created_by_user_id ===
+                req.session.userId
+                  ? `
+                    <p>
+                      <a href="/edit-venue/${venue.id}">
+                        Edit Venue
+                      </a>
+                    </p>
+
+                    <form
+                      action="/delete-venue/${venue.id}"
+                      method="POST"
+                    >
+                      <button
+                        class="delete-button"
+                        type="submit"
+                      >
+                        Delete Venue
+                      </button>
+                    </form>
+                  `
+                  : "";
+
               return `
                 <section class="venue-card">
-                  <h2>${venue.name}</h2>
+                  <h2>
+                    ${escapeHtml(venue.name)}
+                  </h2>
 
                   <p>
                     <strong>City:</strong>
-                    ${venue.city || "Not specified"}
+                    ${escapeHtml(
+                      venue.city || "Not specified"
+                    )}
                   </p>
 
                   ${followSection}
 
-                  <p>
-                    <a href="/edit-venue/${venue.id}">
-                      Edit Venue
-                    </a>
-                  </p>
-
-                  <form
-                    action="/delete-venue/${venue.id}"
-                    method="POST"
-                  >
-                    <button
-                      class="delete-button"
-                      type="submit"
-                    >
-                      Delete Venue
-                    </button>
-                  </form>
+                  ${managementSection}
                 </section>
               `;
             })
@@ -2467,8 +2756,6 @@ app.get("/venues", (req, res) => {
             <a href="/artists">Artists</a>
             <a href="/venues">Venues</a>
             <a href="/add-gig">Add Gig</a>
-            <a href="/login">Login</a>
-            <a href="/register">Register</a>
           </nav>
 
           <main>

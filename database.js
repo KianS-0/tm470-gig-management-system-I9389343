@@ -2,7 +2,10 @@ const sqlite3 = require("sqlite3").verbose();
 
 const db = new sqlite3.Database("gigtracker.db", (err) => {
   if (err) {
-    console.error("Could not connect to database:", err.message);
+    console.error(
+      "Could not connect to database:",
+      err.message
+    );
     return;
   }
 
@@ -19,7 +22,6 @@ const db = new sqlite3.Database("gigtracker.db", (err) => {
 
     console.log("Foreign key enforcement enabled.");
 
-    // Create the users table if it does not already exist
     db.run(
       `CREATE TABLE IF NOT EXISTS users (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -40,81 +42,12 @@ const db = new sqlite3.Database("gigtracker.db", (err) => {
         console.log("Users table ready.");
 
         createFollowTables();
-
-        // Check whether the gigs table already has a user_id column
-        db.all("PRAGMA table_info(gigs)", (tableInfoErr, columns) => {
-          if (tableInfoErr) {
-            console.error(
-              "Could not inspect gigs table:",
-              tableInfoErr.message
-            );
-            return;
-          }
-
-          const hasUserId = columns.some(
-            (column) => column.name === "user_id"
-          );
-
-          if (hasUserId) {
-            console.log("Gig ownership column already exists.");
-            createGigUserIndex();
-            return;
-          }
-
-          // Add user ownership without deleting existing gig data
-          db.run(
-            `ALTER TABLE gigs
-             ADD COLUMN user_id INTEGER REFERENCES users(id)`,
-            (alterErr) => {
-              if (alterErr) {
-                console.error(
-                  "Could not add gig ownership column:",
-                  alterErr.message
-                );
-                return;
-              }
-
-              console.log("Added user ownership column to gigs.");
-
-              // Preserve existing development gigs by assigning
-              // unowned records to the first existing user.
-              db.run(
-                `UPDATE gigs
-                 SET user_id = (
-                   SELECT id
-                   FROM users
-                   ORDER BY id
-                   LIMIT 1
-                 )
-                 WHERE user_id IS NULL
-                   AND EXISTS (
-                     SELECT 1 FROM users
-                   )`,
-                (migrationErr) => {
-                  if (migrationErr) {
-                    console.error(
-                      "Could not migrate existing gigs:",
-                      migrationErr.message
-                    );
-                    return;
-                  }
-
-                  console.log(
-                    "Existing gigs assigned to an existing user."
-                  );
-
-                  createGigUserIndex();
-                }
-              );
-            }
-          );
-        });
+        ensureGigOwnership();
       }
     );
   });
 });
 
-// Create tables used to follow artists and venues
 function createFollowTables() {
   db.run(
     `CREATE TABLE IF NOT EXISTS user_artist_follows (
@@ -195,7 +128,82 @@ function createFollowTables() {
   );
 }
 
-// Index user_id because gig queries frequently filter by logged-in user
+function ensureGigOwnership() {
+  db.all(
+    "PRAGMA table_info(gigs)",
+    (tableInfoErr, columns) => {
+      if (tableInfoErr) {
+        console.error(
+          "Could not inspect gigs table:",
+          tableInfoErr.message
+        );
+        return;
+      }
+
+      const hasUserId = columns.some(
+        (column) => column.name === "user_id"
+      );
+
+      if (hasUserId) {
+        console.log(
+          "Gig ownership column already exists."
+        );
+
+        createGigUserIndex();
+        return;
+      }
+
+      db.run(
+        `ALTER TABLE gigs
+         ADD COLUMN user_id INTEGER
+         REFERENCES users(id)`,
+        (alterErr) => {
+          if (alterErr) {
+            console.error(
+              "Could not add gig ownership column:",
+              alterErr.message
+            );
+            return;
+          }
+
+          console.log(
+            "Added user ownership column to gigs."
+          );
+
+          db.run(
+            `UPDATE gigs
+             SET user_id = (
+               SELECT id
+               FROM users
+               ORDER BY id
+               LIMIT 1
+             )
+             WHERE user_id IS NULL
+               AND EXISTS (
+                 SELECT 1 FROM users
+               )`,
+            (migrationErr) => {
+              if (migrationErr) {
+                console.error(
+                  "Could not migrate existing gigs:",
+                  migrationErr.message
+                );
+                return;
+              }
+
+              console.log(
+                "Existing gigs assigned to an existing user."
+              );
+
+              createGigUserIndex();
+            }
+          );
+        }
+      );
+    }
+  );
+}
+
 function createGigUserIndex() {
   db.run(
     `CREATE INDEX IF NOT EXISTS idx_gigs_user_id
@@ -210,6 +218,276 @@ function createGigUserIndex() {
       }
 
       console.log("Gig ownership index ready.");
+
+      ensureArtistOwnership();
+    }
+  );
+}
+
+function ensureArtistOwnership() {
+  db.all(
+    "PRAGMA table_info(artists)",
+    (tableInfoErr, columns) => {
+      if (tableInfoErr) {
+        console.error(
+          "Could not inspect artists table:",
+          tableInfoErr.message
+        );
+        return;
+      }
+
+      const hasCreatorColumn = columns.some(
+        (column) =>
+          column.name === "created_by_user_id"
+      );
+
+      const continueMigration = () => {
+        migrateArtistOwnership();
+      };
+
+      if (hasCreatorColumn) {
+        console.log(
+          "Artist ownership column already exists."
+        );
+
+        continueMigration();
+        return;
+      }
+
+      db.run(
+        `ALTER TABLE artists
+         ADD COLUMN created_by_user_id INTEGER
+         REFERENCES users(id)`,
+        (alterErr) => {
+          if (alterErr) {
+            console.error(
+              "Could not add artist ownership column:",
+              alterErr.message
+            );
+            return;
+          }
+
+          console.log(
+            "Added ownership column to artists."
+          );
+
+          continueMigration();
+        }
+      );
+    }
+  );
+}
+
+function migrateArtistOwnership() {
+  // Where possible, infer ownership from the user who owns
+  // an existing gig linked to the artist.
+  db.run(
+    `UPDATE artists
+     SET created_by_user_id = (
+       SELECT gigs.user_id
+       FROM gigs
+       WHERE gigs.artist_id = artists.id
+         AND gigs.user_id IS NOT NULL
+       ORDER BY gigs.id ASC
+       LIMIT 1
+     )
+     WHERE created_by_user_id IS NULL
+       AND EXISTS (
+         SELECT 1
+         FROM gigs
+         WHERE gigs.artist_id = artists.id
+           AND gigs.user_id IS NOT NULL
+       )`,
+    (gigMigrationErr) => {
+      if (gigMigrationErr) {
+        console.error(
+          "Could not infer artist ownership:",
+          gigMigrationErr.message
+        );
+        return;
+      }
+
+      // Any remaining development artists that are not
+      // linked to gigs are assigned to the first user.
+      db.run(
+        `UPDATE artists
+         SET created_by_user_id = (
+           SELECT id
+           FROM users
+           ORDER BY id
+           LIMIT 1
+         )
+         WHERE created_by_user_id IS NULL
+           AND EXISTS (
+             SELECT 1 FROM users
+           )`,
+        (fallbackErr) => {
+          if (fallbackErr) {
+            console.error(
+              "Could not migrate remaining artists:",
+              fallbackErr.message
+            );
+            return;
+          }
+
+          console.log(
+            "Existing artist ownership migrated."
+          );
+
+          db.run(
+            `CREATE INDEX IF NOT EXISTS
+             idx_artists_created_by_user
+             ON artists(created_by_user_id)`,
+            (indexErr) => {
+              if (indexErr) {
+                console.error(
+                  "Could not create artist ownership index:",
+                  indexErr.message
+                );
+                return;
+              }
+
+              console.log(
+                "Artist ownership index ready."
+              );
+
+              ensureVenueOwnership();
+            }
+          );
+        }
+      );
+    }
+  );
+}
+
+function ensureVenueOwnership() {
+  db.all(
+    "PRAGMA table_info(venues)",
+    (tableInfoErr, columns) => {
+      if (tableInfoErr) {
+        console.error(
+          "Could not inspect venues table:",
+          tableInfoErr.message
+        );
+        return;
+      }
+
+      const hasCreatorColumn = columns.some(
+        (column) =>
+          column.name === "created_by_user_id"
+      );
+
+      const continueMigration = () => {
+        migrateVenueOwnership();
+      };
+
+      if (hasCreatorColumn) {
+        console.log(
+          "Venue ownership column already exists."
+        );
+
+        continueMigration();
+        return;
+      }
+
+      db.run(
+        `ALTER TABLE venues
+         ADD COLUMN created_by_user_id INTEGER
+         REFERENCES users(id)`,
+        (alterErr) => {
+          if (alterErr) {
+            console.error(
+              "Could not add venue ownership column:",
+              alterErr.message
+            );
+            return;
+          }
+
+          console.log(
+            "Added ownership column to venues."
+          );
+
+          continueMigration();
+        }
+      );
+    }
+  );
+}
+
+function migrateVenueOwnership() {
+  // Where possible, infer ownership from the user who owns
+  // an existing gig linked to the venue.
+  db.run(
+    `UPDATE venues
+     SET created_by_user_id = (
+       SELECT gigs.user_id
+       FROM gigs
+       WHERE gigs.venue_id = venues.id
+         AND gigs.user_id IS NOT NULL
+       ORDER BY gigs.id ASC
+       LIMIT 1
+     )
+     WHERE created_by_user_id IS NULL
+       AND EXISTS (
+         SELECT 1
+         FROM gigs
+         WHERE gigs.venue_id = venues.id
+           AND gigs.user_id IS NOT NULL
+       )`,
+    (gigMigrationErr) => {
+      if (gigMigrationErr) {
+        console.error(
+          "Could not infer venue ownership:",
+          gigMigrationErr.message
+        );
+        return;
+      }
+
+      db.run(
+        `UPDATE venues
+         SET created_by_user_id = (
+           SELECT id
+           FROM users
+           ORDER BY id
+           LIMIT 1
+         )
+         WHERE created_by_user_id IS NULL
+           AND EXISTS (
+             SELECT 1 FROM users
+           )`,
+        (fallbackErr) => {
+          if (fallbackErr) {
+            console.error(
+              "Could not migrate remaining venues:",
+              fallbackErr.message
+            );
+            return;
+          }
+
+          console.log(
+            "Existing venue ownership migrated."
+          );
+
+          db.run(
+            `CREATE INDEX IF NOT EXISTS
+             idx_venues_created_by_user
+             ON venues(created_by_user_id)`,
+            (indexErr) => {
+              if (indexErr) {
+                console.error(
+                  "Could not create venue ownership index:",
+                  indexErr.message
+                );
+                return;
+              }
+
+              console.log(
+                "Venue ownership index ready."
+              );
+            }
+          );
+        }
+      );
     }
   );
 }
