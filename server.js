@@ -524,6 +524,18 @@ if (!validStatuses.includes(selectedAttendanceStatus)) {
   return res.status(400).send("Invalid attendance status.");
 }
 
+if (ticket_url) {
+  try {
+    const parsedTicketUrl = new URL(ticket_url);
+
+    if (!["http:", "https:"].includes(parsedTicketUrl.protocol)) {
+      return res.status(400).send("Ticket link must use http or https.");
+    }
+  } catch {
+    return res.status(400).send("Invalid ticket link.");
+  }
+}
+
   db.serialize(() => {
     db.run(
       "INSERT OR IGNORE INTO artists (name) VALUES (?)",
