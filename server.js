@@ -289,18 +289,25 @@ app.get("/gigs", (req, res) => {
                     )}
                   </p>
 
+                  
                   ${ticketLink}
 
-                  <p>
-                    <a href="/edit-gig/${gig.id}">
-                      Edit Gig
-                    </a>
-                  </p>
+<p>
+  <a href="/export-gig/${gig.id}">
+    Export to Calendar (.ics)
+  </a>
+</p>
 
-                  <form
-                    action="/delete-gig/${gig.id}"
-                    method="POST"
-                  >
+<p>
+  <a href="/edit-gig/${gig.id}">
+    Edit Gig
+  </a>
+</p>
+
+<form
+  action="/delete-gig/${gig.id}"
+  method="POST"
+>
                     <button
                       class="delete-button"
                       type="submit"
@@ -528,6 +535,132 @@ app.get("/gigs", (req, res) => {
         </body>
         </html>
       `);
+    }
+  );
+});
+
+app.get("/export-gig/:id", (req, res) => {
+  const gigId = req.params.id;
+
+  db.get(
+    `SELECT
+       gigs.id,
+       gigs.title,
+       gigs.gig_date,
+       gigs.ticket_url,
+       gigs.notes,
+       artists.name AS artist_name,
+       venues.name AS venue_name,
+       venues.city AS venue_city
+     FROM gigs
+     JOIN artists
+       ON gigs.artist_id = artists.id
+     JOIN venues
+       ON gigs.venue_id = venues.id
+     WHERE gigs.id = ?
+       AND gigs.user_id = ?`,
+    [gigId, req.session.userId],
+    (err, gig) => {
+      if (err) {
+        return res
+          .status(500)
+          .send("Database error: " + err.message);
+      }
+
+      if (!gig) {
+        return res.status(404).send("Gig not found.");
+      }
+
+      const gigDate = new Date(
+        `${gig.gig_date}T00:00:00Z`
+      );
+
+      if (Number.isNaN(gigDate.getTime())) {
+        return res.status(400).send("Invalid gig date.");
+      }
+
+      const nextDate = new Date(gigDate);
+      nextDate.setUTCDate(nextDate.getUTCDate() + 1);
+
+      const formatCalendarDate = (date) => {
+        const year = date.getUTCFullYear();
+
+        const month = String(
+          date.getUTCMonth() + 1
+        ).padStart(2, "0");
+
+        const day = String(
+          date.getUTCDate()
+        ).padStart(2, "0");
+
+        return `${year}${month}${day}`;
+      };
+
+      const escapeCalendarText = (value) =>
+        String(value || "")
+          .replaceAll("\\", "\\\\")
+          .replaceAll("\r\n", "\\n")
+          .replaceAll("\n", "\\n")
+          .replaceAll(",", "\\,")
+          .replaceAll(";", "\\;");
+
+      const dtStamp = new Date()
+        .toISOString()
+        .replace(/[-:]/g, "")
+        .replace(/\.\d{3}Z$/, "Z");
+
+      const location = [
+        gig.venue_name,
+        gig.venue_city
+      ]
+        .filter(Boolean)
+        .join(", ");
+
+      const descriptionParts = [
+        `Artist: ${gig.artist_name}`,
+        gig.notes
+          ? `Notes: ${gig.notes}`
+          : "",
+        gig.ticket_url
+          ? `Tickets: ${gig.ticket_url}`
+          : ""
+      ].filter(Boolean);
+
+      const calendar = [
+        "BEGIN:VCALENDAR",
+        "VERSION:2.0",
+        "PRODID:-//GigTracker//Gig Calendar//EN",
+        "CALSCALE:GREGORIAN",
+        "BEGIN:VEVENT",
+        `UID:gig-${gig.id}-user-${req.session.userId}@gigtracker.local`,
+        `DTSTAMP:${dtStamp}`,
+        `DTSTART;VALUE=DATE:${formatCalendarDate(gigDate)}`,
+        `DTEND;VALUE=DATE:${formatCalendarDate(nextDate)}`,
+        `SUMMARY:${escapeCalendarText(gig.title)}`,
+        `LOCATION:${escapeCalendarText(location)}`,
+        `DESCRIPTION:${escapeCalendarText(
+          descriptionParts.join("\n")
+        )}`,
+        "END:VEVENT",
+        "END:VCALENDAR"
+      ].join("\r\n");
+
+      const safeFilename = gig.title
+        .replace(/[^a-z0-9]+/gi, "-")
+        .replace(/^-+|-+$/g, "")
+        .toLowerCase() || "gig";
+
+      res.setHeader(
+        "Content-Type",
+        "text/calendar; charset=utf-8"
+      );
+
+      res.setHeader(
+        "Content-Disposition",
+        `attachment; filename="${safeFilename}.ics"`
+      );
+
+      res.send(calendar);
     }
   );
 });
