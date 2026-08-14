@@ -1,114 +1,82 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>GigTracker - Register</title>
-  <style>
-    body {
-      font-family: Arial, sans-serif;
-      margin: 0;
-      line-height: 1.6;
-      background-color: #f4f4f4;
-      color: #222;
-    }
-
-    nav {
-      background-color: #111827;
-      padding: 20px 40px;
-    }
-
-    nav a {
-      color: white;
-      text-decoration: none;
-      margin-right: 20px;
-      font-weight: bold;
-    }
-
-    .page {
-      padding: 40px;
-    }
-
-    .card {
-      background-color: white;
-      padding: 30px;
-      border-radius: 8px;
-      max-width: 500px;
-    }
-
-    h1 {
-      margin-top: 0;
-    }
-
-    label {
-      display: block;
-      margin-top: 15px;
-      margin-bottom: 5px;
-      font-weight: bold;
-    }
-
-    input {
-      width: 100%;
-      padding: 10px;
-      box-sizing: border-box;
-      margin-bottom: 10px;
-    }
-
-    .button {
-      display: inline-block;
-      padding: 12px 20px;
-      text-decoration: none;
-      font-weight: bold;
-      border-radius: 6px;
-      background-color: #2563eb;
-      color: white;
-      border: none;
-      cursor: pointer;
-      margin-top: 10px;
-    }
-
-    .helper-text {
-      margin-top: 15px;
-    }
-
-    .helper-text a {
-      color: #2563eb;
-      text-decoration: none;
-      font-weight: bold;
-    }
-  </style>
-<link rel="stylesheet" href="/styles.css">
+  <link rel="stylesheet" href="/styles.css">
 </head>
+
 <body>
   <nav>
-    <a href="index.html">Home</a>
+    <a href="/">Home</a>
     <a href="/gigs">Gigs</a>
-    <a href="artists">Artists</a>
-    <a href="venues">Venues</a>
-    <a href="add-gig.html">Add Gig</a>
-    <a href="login">Login</a>
-    <a href="register">Register</a>
+    <a href="/artists">Artists</a>
+    <a href="/venues">Venues</a>
+    <a href="/add-gig.html">Add Gig</a>
+    <a href="/login">Login</a>
+    <a href="/register">Register</a>
   </nav>
 
-  <div class="page">
+  <main class="page">
     <div class="card">
-      <h1>Register</h1>
-      <p>Create your GigTracker account.</p>
+      <h1>Create an account</h1>
 
-      <label for="name">Name</label>
-      <input type="text" id="name" placeholder="Enter your name">
+      <p>
+        Register for GigTracker to manage your gigs, artists and venues.
+      </p>
 
-      <label for="email">Email</label>
-      <input type="email" id="email" placeholder="Enter your email">
+      <form action="/register" method="POST">
+        <label for="name">Name</label>
+        <input
+          type="text"
+          id="name"
+          name="name"
+          required
+          maxlength="100"
+          autocomplete="name"
+        >
 
-      <label for="password">Password</label>
-      <input type="password" id="password" placeholder="Enter your password">
+        <label for="email">Email</label>
+        <input
+          type="email"
+          id="email"
+          name="email"
+          required
+          maxlength="255"
+          autocomplete="email"
+        >
 
-      <label for="confirm-password">Confirm Password</label>
-      <input type="password" id="confirm-password" placeholder="Confirm your password">
+        <label for="password">Password</label>
+        <input
+          type="password"
+          id="password"
+          name="password"
+          required
+          minlength="8"
+          autocomplete="new-password"
+        >
 
-      <button class="button">Create account</button>
+        <label for="confirm_password">Confirm password</label>
+        <input
+          type="password"
+          id="confirm_password"
+          name="confirm_password"
+          required
+          minlength="8"
+          autocomplete="new-password"
+        >
 
-      <p class="helper-text">Already have an account? <a href="login">Log in here</a></p>
+        <button class="button" type="submit">
+          Create account
+        </button>
+      </form>
+
+      <p class="helper-text">
+        Already have an account?
+        <a href="/login">Log in here</a>
+      </p>
     </div>
-  </div>
+  </main>
 </body>
 </html>

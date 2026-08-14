@@ -1,5 +1,6 @@
 const express = require("express");
 const path = require("path");
+const bcrypt = require("bcryptjs");
 const db = require("./database");
 
 const app = express();
@@ -1414,6 +1415,76 @@ app.get("/login", (req, res) => {
 // Register page
 app.get("/register", (req, res) => {
   res.sendFile(path.join(__dirname, "register.html"));
+});
+
+// Create a new user account
+app.post("/register", (req, res) => {
+  const { name, email, password, confirm_password } = req.body;
+
+  // Check that all required fields were submitted
+  if (!name || !email || !password || !confirm_password) {
+    return res.status(400).send("Please complete all registration fields.");
+  }
+
+  const cleanName = name.trim();
+  const cleanEmail = email.trim().toLowerCase();
+
+  if (!cleanName || !cleanEmail) {
+    return res.status(400).send("Name and email cannot be blank.");
+  }
+
+  // Password must be at least 8 characters
+  if (password.length < 8) {
+    return res
+      .status(400)
+      .send("Password must be at least 8 characters long.");
+  }
+
+  // Both password fields must match
+  if (password !== confirm_password) {
+    return res.status(400).send("Passwords do not match.");
+  }
+
+  // Check whether the email address is already registered
+  db.get(
+    "SELECT id FROM users WHERE email = ?",
+    [cleanEmail],
+    (lookupErr, existingUser) => {
+      if (lookupErr) {
+        return res
+          .status(500)
+          .send("Registration error: " + lookupErr.message);
+      }
+
+      if (existingUser) {
+        return res
+          .status(400)
+          .send("An account with this email already exists.");
+      }
+
+      // Hash the password so the plain password is never stored
+      bcrypt.hash(password, 12, (hashErr, passwordHash) => {
+        if (hashErr) {
+          return res.status(500).send("Could not secure password.");
+        }
+
+        db.run(
+          `INSERT INTO users (name, email, password_hash)
+           VALUES (?, ?, ?)`,
+          [cleanName, cleanEmail, passwordHash],
+          function (insertErr) {
+            if (insertErr) {
+              return res
+                .status(500)
+                .send("Could not create account: " + insertErr.message);
+            }
+
+            res.redirect("/login");
+          }
+        );
+      });
+    }
+  );
 });
 
 // Database test route
