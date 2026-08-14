@@ -26,6 +26,47 @@ app.use(
   })
 );
 
+// Require authentication for private GigTracker pages and actions
+function requireLogin(req, res, next) {
+  // Pages and files that anyone is allowed to access
+  const publicPaths = [
+    "/",
+    "/index.html",
+    "/login",
+    "/login.html",
+    "/register",
+    "/register.html",
+    "/session-test",
+    "/styles.css",
+    "/favicon.ico"
+  ];
+
+  const isPublicPath =
+    publicPaths.includes(req.path) ||
+    req.path.startsWith("/images/");
+
+  if (isPublicPath) {
+    return next();
+  }
+
+  // Logged-in users can continue normally
+  if (req.session.userId) {
+    return next();
+  }
+
+  // If someone manually visits a private page, send them to Login
+  if (req.method === "GET") {
+    return res.redirect("/login");
+  }
+
+  // Block unauthorised POST requests such as adding/deleting records
+  return res.status(401).send(
+    "You must be logged in to perform this action."
+  );
+}
+
+app.use(requireLogin);
+
 // Serve files such as HTML, CSS and images from this project folder
 app.use(express.static(__dirname));
 
