@@ -77,8 +77,123 @@ app.get("/", (req, res) => {
 
 // Gigs page - reads gig data from SQLite and displays it as HTML
 app.get("/gigs", (req, res) => {
+  const search = req.query.search
+    ? req.query.search.trim()
+    : "";
+
+  const city = req.query.city
+    ? req.query.city.trim()
+    : "";
+
+  const dateFrom = req.query.date_from || "";
+  const dateTo = req.query.date_to || "";
+  const attendance = req.query.attendance || "";
+
+  const followedArtists =
+    req.query.followed_artists === "1";
+
+  const followedVenues =
+    req.query.followed_venues === "1";
+
+  // Escape values before placing them back into HTML form fields
+  const escapeHtml = (value) =>
+    String(value)
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")
+      .replaceAll('"', "&quot;")
+      .replaceAll("'", "&#039;");
+
+  const conditions = [
+    "gigs.user_id = ?"
+  ];
+
+  const params = [
+    req.session.userId
+  ];
+
+  if (search) {
+    conditions.push(`
+      (
+        LOWER(gigs.title) LIKE LOWER(?)
+        OR LOWER(artists.name) LIKE LOWER(?)
+        OR LOWER(venues.name) LIKE LOWER(?)
+      )
+    `);
+
+    const searchValue = `%${search}%`;
+
+    params.push(
+      searchValue,
+      searchValue,
+      searchValue
+    );
+  }
+
+  if (city) {
+    conditions.push(
+      "LOWER(venues.city) LIKE LOWER(?)"
+    );
+
+    params.push(`%${city}%`);
+  }
+
+  if (dateFrom) {
+    conditions.push(
+      "DATE(gigs.gig_date) >= DATE(?)"
+    );
+
+    params.push(dateFrom);
+  }
+
+  if (dateTo) {
+    conditions.push(
+      "DATE(gigs.gig_date) <= DATE(?)"
+    );
+
+    params.push(dateTo);
+  }
+
+  if (
+    attendance === "Going" ||
+    attendance === "Maybe" ||
+    attendance === "Went"
+  ) {
+    conditions.push(
+      "attendance.status = ?"
+    );
+
+    params.push(attendance);
+  }
+
+  if (followedArtists) {
+    conditions.push(`
+      EXISTS (
+        SELECT 1
+        FROM user_artist_follows
+        WHERE user_artist_follows.user_id = ?
+          AND user_artist_follows.artist_id = gigs.artist_id
+      )
+    `);
+
+    params.push(req.session.userId);
+  }
+
+  if (followedVenues) {
+    conditions.push(`
+      EXISTS (
+        SELECT 1
+        FROM user_venue_follows
+        WHERE user_venue_follows.user_id = ?
+          AND user_venue_follows.venue_id = gigs.venue_id
+      )
+    `);
+
+    params.push(req.session.userId);
+  }
+
   const sql = `
-    SELECT 
+    SELECT
       gigs.id,
       gigs.title,
       gigs.gig_date,
@@ -89,114 +204,332 @@ app.get("/gigs", (req, res) => {
       venues.city AS venue_city,
       attendance.status AS attendance_status
     FROM gigs
-    JOIN artists ON gigs.artist_id = artists.id
-    JOIN venues ON gigs.venue_id = venues.id
-    LEFT JOIN attendance ON attendance.gig_id = gigs.id
-    WHERE gigs.user_id = ?
+    JOIN artists
+      ON gigs.artist_id = artists.id
+    JOIN venues
+      ON gigs.venue_id = venues.id
+    LEFT JOIN attendance
+      ON attendance.gig_id = gigs.id
+    WHERE ${conditions.join(" AND ")}
     ORDER BY gigs.gig_date ASC
   `;
 
-  db.all(sql, [req.session.userId], (err, gigs) => {
-    if (err) {
-      return res.status(500).send("Database error: " + err.message);
-    }
+  db.all(
+    sql,
+    params,
+    (err, gigs) => {
+      if (err) {
+        return res
+          .status(500)
+          .send(
+            "Database error: " + err.message
+          );
+      }
 
-    const gigCards = gigs.map((gig) => `
-      <section class="gig-card">
-        <h2>${gig.title}</h2>
-        <p><strong>Artist:</strong> ${gig.artist_name}</p>
-        <p><strong>Venue:</strong> ${gig.venue_name}, ${gig.venue_city}</p>
-        <p><strong>Date:</strong> ${gig.gig_date}</p>
-        <p><strong>Attendance:</strong> ${gig.attendance_status || "Not set"}</p>
-        <p><strong>Notes:</strong> ${gig.notes || "No notes added"}</p>
-        <p><a href="${gig.ticket_url}" target="_blank">Ticket link</a></p>
-        <p><a href="/edit-gig/${gig.id}">Edit Gig</a></p>
+      const gigCards = gigs.length
+        ? gigs
+            .map((gig) => {
+              const ticketLink = gig.ticket_url
+                ? `
+                  <p>
+                    <a
+                      href="${escapeHtml(gig.ticket_url)}"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      Ticket link
+                    </a>
+                  </p>
+                `
+                : `
+                  <p>
+                    <strong>Ticket link:</strong>
+                    Not provided
+                  </p>
+                `;
 
-        <form action="/delete-gig/${gig.id}" method="POST">
-          <button class="delete-button" type="submit">Delete Gig</button>
-        </form>
-      </section>
-    `).join("");
+              return `
+                <section class="gig-card">
+                  <h2>
+                    ${escapeHtml(gig.title)}
+                  </h2>
 
-    res.send(`
-      <!DOCTYPE html>
-      <html lang="en">
-      <head>
-        <meta charset="UTF-8">
-        <title>Gigs - GigTracker</title>
-        <style>
-          body {
-            font-family: Arial, sans-serif;
-            margin: 0;
-            line-height: 1.6;
-            background: #f5f5f5;
-            color: #222;
-          }
+                  <p>
+                    <strong>Artist:</strong>
+                    ${escapeHtml(gig.artist_name)}
+                  </p>
 
-          nav {
-            background-color: #111827;
-            padding: 20px 40px;
-          }
+                  <p>
+                    <strong>Venue:</strong>
+                    ${escapeHtml(gig.venue_name)},
+                    ${escapeHtml(
+                      gig.venue_city ||
+                      "Not specified"
+                    )}
+                  </p>
 
-          nav a {
-            color: white;
-            margin-right: 1rem;
-            text-decoration: none;
-            font-weight: bold;
-          }
+                  <p>
+                    <strong>Date:</strong>
+                    ${escapeHtml(gig.gig_date)}
+                  </p>
 
-          main {
-            max-width: 900px;
-            margin: 2rem auto;
-            padding: 1rem;
-          }
+                  <p>
+                    <strong>Attendance:</strong>
+                    ${escapeHtml(
+                      gig.attendance_status ||
+                      "Not set"
+                    )}
+                  </p>
 
-          .gig-card {
-            background: white;
-            border: 1px solid #ddd;
-            border-radius: 8px;
-            padding: 1rem;
-            margin-bottom: 1rem;
-          }
+                  <p>
+                    <strong>Notes:</strong>
+                    ${escapeHtml(
+                      gig.notes ||
+                      "No notes added"
+                    )}
+                  </p>
 
-          .gig-card h2 {
-            margin-top: 0;
-          }
+                  ${ticketLink}
 
-          .delete-button {
-            background: #b91c1c;
-            color: white;
-            border: none;
-            padding: 0.6rem 1rem;
-            border-radius: 6px;
-            cursor: pointer;
-            font-weight: bold;
-          }
-        </style>
-        <link rel="stylesheet" href="/styles.css">
-      </head>
-      <body>
-        <nav>
-          <a href="/">Home</a>
-          <a href="/gigs">Gigs</a>
-          <a href="/add-gig">Add Gig</a>
-          <a href="/artists">Artists</a>
-          <a href="/venues">Venues</a>
-          <a href="/login">Login</a>
-          <a href="/register">Register</a>
-        </nav>
+                  <p>
+                    <a href="/edit-gig/${gig.id}">
+                      Edit Gig
+                    </a>
+                  </p>
 
-        <main>
-          <h1>My Gigs</h1>
+                  <form
+                    action="/delete-gig/${gig.id}"
+                    method="POST"
+                  >
+                    <button
+                      class="delete-button"
+                      type="submit"
+                    >
+                      Delete Gig
+                    </button>
+                  </form>
+                </section>
+              `;
+            })
+            .join("")
+        : `
           <p>
-            Showing gigs for ${req.session.userName}.
+            No gigs match the selected filters.
           </p>
-          ${gigCards || "<p>You have not added any gigs yet.</p>"}
-        </main>
-      </body>
-      </html>
-    `);
-  });
+        `;
+
+      const filtersAreActive =
+        search ||
+        city ||
+        dateFrom ||
+        dateTo ||
+        attendance ||
+        followedArtists ||
+        followedVenues;
+
+      res.send(`
+        <!DOCTYPE html>
+        <html lang="en">
+
+        <head>
+          <meta charset="UTF-8">
+
+          <meta
+            name="viewport"
+            content="width=device-width, initial-scale=1.0"
+          >
+
+          <title>Gigs - GigTracker</title>
+
+          <link
+            rel="stylesheet"
+            href="/styles.css"
+          >
+        </head>
+
+        <body>
+          <nav>
+            <a href="/">Home</a>
+            <a href="/gigs">Gigs</a>
+            <a href="/add-gig">Add Gig</a>
+            <a href="/artists">Artists</a>
+            <a href="/venues">Venues</a>
+            <a href="/login">Login</a>
+            <a href="/register">Register</a>
+          </nav>
+
+          <main>
+            <h1>My Gigs</h1>
+
+            <p>
+              Showing gigs for
+              ${escapeHtml(req.session.userName)}.
+            </p>
+
+            <section class="gig-card">
+              <h2>Search and Filter</h2>
+
+              <form
+                action="/gigs"
+                method="GET"
+              >
+                <label for="search">
+                  Search title, artist or venue
+                </label>
+
+                <input
+                  type="text"
+                  id="search"
+                  name="search"
+                  value="${escapeHtml(search)}"
+                  placeholder="e.g. Amazons"
+                >
+
+                <label for="city">
+                  City
+                </label>
+
+                <input
+                  type="text"
+                  id="city"
+                  name="city"
+                  value="${escapeHtml(city)}"
+                  placeholder="e.g. London"
+                >
+
+                <label for="date_from">
+                  From date
+                </label>
+
+                <input
+                  type="date"
+                  id="date_from"
+                  name="date_from"
+                  value="${escapeHtml(dateFrom)}"
+                >
+
+                <label for="date_to">
+                  To date
+                </label>
+
+                <input
+                  type="date"
+                  id="date_to"
+                  name="date_to"
+                  value="${escapeHtml(dateTo)}"
+                >
+
+                <label for="attendance">
+                  Attendance
+                </label>
+
+                <select
+                  id="attendance"
+                  name="attendance"
+                >
+                  <option value="">
+                    Any status
+                  </option>
+
+                  <option
+                    value="Going"
+                    ${
+                      attendance === "Going"
+                        ? "selected"
+                        : ""
+                    }
+                  >
+                    Going
+                  </option>
+
+                  <option
+                    value="Maybe"
+                    ${
+                      attendance === "Maybe"
+                        ? "selected"
+                        : ""
+                    }
+                  >
+                    Maybe
+                  </option>
+
+                  <option
+                    value="Went"
+                    ${
+                      attendance === "Went"
+                        ? "selected"
+                        : ""
+                    }
+                  >
+                    Went
+                  </option>
+                </select>
+
+                <p>
+                  <label>
+                    <input
+                      type="checkbox"
+                      name="followed_artists"
+                      value="1"
+                      ${
+                        followedArtists
+                          ? "checked"
+                          : ""
+                      }
+                    >
+                    Followed artists only
+                  </label>
+                </p>
+
+                <p>
+                  <label>
+                    <input
+                      type="checkbox"
+                      name="followed_venues"
+                      value="1"
+                      ${
+                        followedVenues
+                          ? "checked"
+                          : ""
+                      }
+                    >
+                    Followed venues only
+                  </label>
+                </p>
+
+                <button type="submit">
+                  Apply Filters
+                </button>
+
+                ${
+                  filtersAreActive
+                    ? `
+                      <p>
+                        <a href="/gigs">
+                          Clear Filters
+                        </a>
+                      </p>
+                    `
+                    : ""
+                }
+              </form>
+            </section>
+
+            <h2>
+              ${
+                filtersAreActive
+                  ? `Results (${gigs.length})`
+                  : `All Gigs (${gigs.length})`
+              }
+            </h2>
+
+            ${gigCards}
+          </main>
+        </body>
+        </html>
+      `);
+    }
+  );
 });
 
 // Edit gig page - loads the selected gig from SQLite
