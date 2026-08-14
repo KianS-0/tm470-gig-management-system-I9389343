@@ -316,6 +316,112 @@ app.get("/dashboard", (req, res) => {
   );
 });
 
+// JSON API - return gigs belonging to the logged-in user
+app.get("/api/gigs", (req, res) => {
+  const sql = `
+    SELECT
+      gigs.id,
+      gigs.title,
+      gigs.gig_date,
+      gigs.ticket_url,
+      gigs.notes,
+      artists.id AS artist_id,
+      artists.name AS artist_name,
+      venues.id AS venue_id,
+      venues.name AS venue_name,
+      venues.city AS venue_city,
+      attendance.status AS attendance_status
+    FROM gigs
+    JOIN artists
+      ON artists.id = gigs.artist_id
+    JOIN venues
+      ON venues.id = gigs.venue_id
+    LEFT JOIN attendance
+      ON attendance.gig_id = gigs.id
+    WHERE gigs.user_id = ?
+    ORDER BY gigs.gig_date ASC
+  `;
+
+  db.all(
+    sql,
+    [req.session.userId],
+    (err, gigs) => {
+      if (err) {
+        return res.status(500).json({
+          error: "Could not retrieve gigs."
+        });
+      }
+
+      res.json(gigs);
+    }
+  );
+});
+
+// JSON API - return artists and the logged-in user's follow state
+app.get("/api/artists", (req, res) => {
+  const sql = `
+    SELECT
+      artists.id,
+      artists.name,
+      CASE
+        WHEN user_artist_follows.user_id IS NULL THEN 0
+        ELSE 1
+      END AS is_followed
+    FROM artists
+    LEFT JOIN user_artist_follows
+      ON user_artist_follows.artist_id = artists.id
+      AND user_artist_follows.user_id = ?
+    ORDER BY artists.name COLLATE NOCASE
+  `;
+
+  db.all(
+    sql,
+    [req.session.userId],
+    (err, artists) => {
+      if (err) {
+        return res.status(500).json({
+          error: "Could not retrieve artists."
+        });
+      }
+
+      res.json(artists);
+    }
+  );
+});
+
+// JSON API - return venues and the logged-in user's follow state
+app.get("/api/venues", (req, res) => {
+  const sql = `
+    SELECT
+      venues.id,
+      venues.name,
+      venues.city,
+      CASE
+        WHEN user_venue_follows.user_id IS NULL THEN 0
+        ELSE 1
+      END AS is_followed
+    FROM venues
+    LEFT JOIN user_venue_follows
+      ON user_venue_follows.venue_id = venues.id
+      AND user_venue_follows.user_id = ?
+    ORDER BY venues.name COLLATE NOCASE
+  `;
+
+  db.all(
+    sql,
+    [req.session.userId],
+    (err, venues) => {
+      if (err) {
+        return res.status(500).json({
+          error: "Could not retrieve venues."
+        });
+      }
+
+      res.json(venues);
+    }
+  );
+});
+
 // Gigs page - reads gig data from SQLite and displays it as HTML
 app.get("/gigs", (req, res) => {
   const search = req.query.search
