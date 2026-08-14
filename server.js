@@ -1481,6 +1481,36 @@ app.post("/login", (req, res) => {
   );
 });
 
+// Check whether a user is currently logged in
+app.get("/session-test", (req, res) => {
+  if (!req.session.userId) {
+    return res.status(401).json({
+      loggedIn: false
+    });
+  }
+
+  res.json({
+    loggedIn: true,
+    user: {
+      id: req.session.userId,
+      name: req.session.userName,
+      email: req.session.userEmail
+    }
+  });
+});
+
+// Log the current user out
+app.post("/logout", (req, res) => {
+  req.session.destroy((sessionErr) => {
+    if (sessionErr) {
+      return res.status(500).send("Could not log out.");
+    }
+
+    res.clearCookie("connect.sid");
+    res.redirect("/");
+  });
+});
+
 // Register page
 app.get("/register", (req, res) => {
   res.sendFile(path.join(__dirname, "register.html"));
