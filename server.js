@@ -1550,8 +1550,20 @@ app.post("/delete-venue/:id", (req, res) => {
 // Venues page - displays venues from SQLite
 app.get("/venues", (req, res) => {
   db.all(
-    "SELECT id, name, city FROM venues ORDER BY name COLLATE NOCASE",
-    [],
+    `SELECT
+       venues.id,
+       venues.name,
+       venues.city,
+       CASE
+         WHEN user_venue_follows.user_id IS NULL THEN 0
+         ELSE 1
+       END AS is_followed
+     FROM venues
+     LEFT JOIN user_venue_follows
+       ON user_venue_follows.venue_id = venues.id
+       AND user_venue_follows.user_id = ?
+     ORDER BY venues.name COLLATE NOCASE`,
+    [req.session.userId],
     (err, venues) => {
       if (err) {
         return res
@@ -1561,18 +1573,52 @@ app.get("/venues", (req, res) => {
 
       const venueCards = venues.length
         ? venues
-            .map(
-              (venue) => `
+            .map((venue) => {
+              const followSection = venue.is_followed
+                ? `
+                  <p><strong>Following</strong></p>
+
+                  <form action="/unfollow-venue/${venue.id}" method="POST">
+                    <button type="submit">Unfollow</button>
+                  </form>
+                `
+                : `
+                  <form action="/follow-venue/${venue.id}" method="POST">
+                    <button type="submit">Follow</button>
+                  </form>
+                `;
+
+              return `
                 <section class="venue-card">
                   <h2>${venue.name}</h2>
-                  <p><strong>City:</strong> ${venue.city || "Not specified"}</p>
-                  <p><a href="/edit-venue/${venue.id}">Edit Venue</a></p>
-                  <form action="/delete-venue/${venue.id}" method="POST">
-                    <button class="delete-button" type="submit">Delete Venue</button>
+
+                  <p>
+                    <strong>City:</strong>
+                    ${venue.city || "Not specified"}
+                  </p>
+
+                  ${followSection}
+
+                  <p>
+                    <a href="/edit-venue/${venue.id}">
+                      Edit Venue
+                    </a>
+                  </p>
+
+                  <form
+                    action="/delete-venue/${venue.id}"
+                    method="POST"
+                  >
+                    <button
+                      class="delete-button"
+                      type="submit"
+                    >
+                      Delete Venue
+                    </button>
                   </form>
                 </section>
-              `
-            )
+              `;
+            })
             .join("")
         : "<p>No venues found.</p>";
 
@@ -1581,7 +1627,12 @@ app.get("/venues", (req, res) => {
         <html lang="en">
         <head>
           <meta charset="UTF-8">
-          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+          <meta
+            name="viewport"
+            content="width=device-width, initial-scale=1.0"
+          >
+
           <title>Venues - GigTracker</title>
           <link rel="stylesheet" href="/styles.css">
         </head>
@@ -1599,14 +1650,78 @@ app.get("/venues", (req, res) => {
 
           <main>
             <h1>Venues</h1>
-            <p>View the venues currently stored in GigTracker.</p>
-            <p><a class="button" href="/add-venue">Add Venue</a></p>
+
+            <p>
+              View, manage and follow venues in GigTracker.
+            </p>
+
+            <p>
+              <a class="button" href="/add-venue">
+                Add Venue
+              </a>
+            </p>
 
             ${venueCards}
           </main>
         </body>
         </html>
       `);
+    }
+  );
+});
+
+app.post("/follow-venue/:id", (req, res) => {
+  const venueId = req.params.id;
+
+  db.get(
+    "SELECT id FROM venues WHERE id = ?",
+    [venueId],
+    (venueErr, venue) => {
+      if (venueErr) {
+        return res
+          .status(500)
+          .send("Database error: " + venueErr.message);
+      }
+
+      if (!venue) {
+        return res.status(404).send("Venue not found.");
+      }
+
+      db.run(
+        `INSERT OR IGNORE INTO user_venue_follows
+         (user_id, venue_id)
+         VALUES (?, ?)`,
+        [req.session.userId, venueId],
+        (followErr) => {
+          if (followErr) {
+            return res
+              .status(500)
+              .send("Database error: " + followErr.message);
+          }
+
+          res.redirect("/venues");
+        }
+      );
+    }
+  );
+});
+
+app.post("/unfollow-venue/:id", (req, res) => {
+  const venueId = req.params.id;
+
+  db.run(
+    `DELETE FROM user_venue_follows
+     WHERE user_id = ?
+       AND venue_id = ?`,
+    [req.session.userId, venueId],
+    (err) => {
+      if (err) {
+        return res
+          .status(500)
+          .send("Database error: " + err.message);
+      }
+
+      res.redirect("/venues");
     }
   );
 });
