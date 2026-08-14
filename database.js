@@ -39,6 +39,8 @@ const db = new sqlite3.Database("gigtracker.db", (err) => {
 
         console.log("Users table ready.");
 
+        createFollowTables();
+
         // Check whether the gigs table already has a user_id column
         db.all("PRAGMA table_info(gigs)", (tableInfoErr, columns) => {
           if (tableInfoErr) {
@@ -74,7 +76,7 @@ const db = new sqlite3.Database("gigtracker.db", (err) => {
 
               console.log("Added user ownership column to gigs.");
 
-              // Preserve existing test/development gigs by assigning
+              // Preserve existing development gigs by assigning
               // unowned records to the first existing user.
               db.run(
                 `UPDATE gigs
@@ -112,7 +114,88 @@ const db = new sqlite3.Database("gigtracker.db", (err) => {
   });
 });
 
-// Index user_id because gig queries will frequently filter by logged-in user
+// Create tables used to follow artists and venues
+function createFollowTables() {
+  db.run(
+    `CREATE TABLE IF NOT EXISTS user_artist_follows (
+      user_id INTEGER NOT NULL,
+      artist_id INTEGER NOT NULL,
+      followed_at TEXT DEFAULT CURRENT_TIMESTAMP,
+      PRIMARY KEY (user_id, artist_id),
+      FOREIGN KEY (user_id)
+        REFERENCES users(id)
+        ON DELETE CASCADE,
+      FOREIGN KEY (artist_id)
+        REFERENCES artists(id)
+        ON DELETE CASCADE
+    )`,
+    (artistFollowErr) => {
+      if (artistFollowErr) {
+        console.error(
+          "Could not create artist follows table:",
+          artistFollowErr.message
+        );
+        return;
+      }
+
+      console.log("Artist follows table ready.");
+
+      db.run(
+        `CREATE INDEX IF NOT EXISTS idx_artist_follows_artist
+         ON user_artist_follows(artist_id)`,
+        (artistIndexErr) => {
+          if (artistIndexErr) {
+            console.error(
+              "Could not create artist follows index:",
+              artistIndexErr.message
+            );
+          }
+        }
+      );
+    }
+  );
+
+  db.run(
+    `CREATE TABLE IF NOT EXISTS user_venue_follows (
+      user_id INTEGER NOT NULL,
+      venue_id INTEGER NOT NULL,
+      followed_at TEXT DEFAULT CURRENT_TIMESTAMP,
+      PRIMARY KEY (user_id, venue_id),
+      FOREIGN KEY (user_id)
+        REFERENCES users(id)
+        ON DELETE CASCADE,
+      FOREIGN KEY (venue_id)
+        REFERENCES venues(id)
+        ON DELETE CASCADE
+    )`,
+    (venueFollowErr) => {
+      if (venueFollowErr) {
+        console.error(
+          "Could not create venue follows table:",
+          venueFollowErr.message
+        );
+        return;
+      }
+
+      console.log("Venue follows table ready.");
+
+      db.run(
+        `CREATE INDEX IF NOT EXISTS idx_venue_follows_venue
+         ON user_venue_follows(venue_id)`,
+        (venueIndexErr) => {
+          if (venueIndexErr) {
+            console.error(
+              "Could not create venue follows index:",
+              venueIndexErr.message
+            );
+          }
+        }
+      );
+    }
+  );
+}
+
+// Index user_id because gig queries frequently filter by logged-in user
 function createGigUserIndex() {
   db.run(
     `CREATE INDEX IF NOT EXISTS idx_gigs_user_id
