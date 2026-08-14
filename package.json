@@ -7,10 +7,10 @@
     "doc": "docs"
   },
   "scripts": {
-  "start": "node server.js",
-  "init-db": "node init-db.js",
-  "seed-db": "node seed-db.js"
-},
+    "start": "node server.js",
+    "init-db": "node init-db.js",
+    "seed-db": "node seed-db.js"
+  },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/KianS-0/tm470-gig-management-system-I9389343.git"
@@ -24,6 +24,7 @@
   },
   "homepage": "https://github.com/KianS-0/tm470-gig-management-system-I9389343#readme",
   "dependencies": {
+    "bcryptjs": "^3.0.3",
     "express": "^5.2.1",
     "sqlite3": "^6.0.1"
   }
