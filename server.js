@@ -1,6 +1,7 @@
 const express = require("express");
 const path = require("path");
 const bcrypt = require("bcryptjs");
+const session = require("express-session");
 const db = require("./database");
 
 const app = express();
@@ -8,6 +9,22 @@ const PORT = 3000;
 
 // Allow Express to read form data later
 app.use(express.urlencoded({ extended: true }));
+
+// Keep users logged in while they use GigTracker
+app.use(
+  session({
+    secret:
+      process.env.SESSION_SECRET ||
+      "gigtracker-development-session-secret",
+    resave: false,
+    saveUninitialized: false,
+    cookie: {
+      httpOnly: true,
+      sameSite: "lax",
+      maxAge: 1000 * 60 * 60 * 2
+    }
+  })
+);
 
 // Serve files such as HTML, CSS and images from this project folder
 app.use(express.static(__dirname));
@@ -1410,6 +1427,58 @@ app.get("/venues", (req, res) => {
 // Login page
 app.get("/login", (req, res) => {
   res.sendFile(path.join(__dirname, "login.html"));
+});
+
+// Log a user into GigTracker
+app.post("/login", (req, res) => {
+  const { email, password } = req.body;
+
+  if (!email || !password) {
+    return res.status(400).send("Please enter your email and password.");
+  }
+
+  const cleanEmail = email.trim().toLowerCase();
+
+  db.get(
+    `SELECT id, name, email, password_hash
+     FROM users
+     WHERE email = ?`,
+    [cleanEmail],
+    (lookupErr, user) => {
+      if (lookupErr) {
+        return res.status(500).send("Login error: " + lookupErr.message);
+      }
+
+      // Use the same message for a wrong email or password
+      // so the application does not reveal registered email addresses.
+      if (!user) {
+        return res.status(401).send("Incorrect email or password.");
+      }
+
+      bcrypt.compare(password, user.password_hash, (compareErr, matches) => {
+        if (compareErr) {
+          return res.status(500).send("Could not verify password.");
+        }
+
+        if (!matches) {
+          return res.status(401).send("Incorrect email or password.");
+        }
+
+        // Store only the information needed to identify the logged-in user.
+        req.session.userId = user.id;
+        req.session.userName = user.name;
+        req.session.userEmail = user.email;
+
+        req.session.save((sessionErr) => {
+          if (sessionErr) {
+            return res.status(500).send("Could not start login session.");
+          }
+
+          res.redirect("/");
+        });
+      });
+    }
+  );
 });
 
 // Register page
