@@ -1095,8 +1095,19 @@ app.post("/delete-artist/:id", (req, res) => {
 // Artists page - displays artists from SQLite
 app.get("/artists", (req, res) => {
   db.all(
-    "SELECT id, name FROM artists ORDER BY name ASC",
-    [],
+    `SELECT
+       artists.id,
+       artists.name,
+       CASE
+         WHEN user_artist_follows.user_id IS NULL THEN 0
+         ELSE 1
+       END AS is_followed
+     FROM artists
+     LEFT JOIN user_artist_follows
+       ON user_artist_follows.artist_id = artists.id
+       AND user_artist_follows.user_id = ?
+     ORDER BY artists.name ASC`,
+    [req.session.userId],
     (err, artists) => {
       if (err) {
         return res
@@ -1106,17 +1117,46 @@ app.get("/artists", (req, res) => {
 
       const artistCards = artists.length
         ? artists
-            .map(
-              (artist) => `
+            .map((artist) => {
+              const followSection = artist.is_followed
+                ? `
+                  <p><strong>Following</strong></p>
+                  <form action="/unfollow-artist/${artist.id}" method="POST">
+                    <button type="submit">Unfollow</button>
+                  </form>
+                `
+                : `
+                  <form action="/follow-artist/${artist.id}" method="POST">
+                    <button type="submit">Follow</button>
+                  </form>
+                `;
+
+              return `
                 <section class="artist-card">
                   <h2>${artist.name}</h2>
-                  <p><a href="/edit-artist/${artist.id}">Edit Artist</a></p>
-                  <form action="/delete-artist/${artist.id}" method="POST">
-                <button class="delete-button" type="submit">Delete Artist</button>
-              </form>
+
+                  ${followSection}
+
+                  <p>
+                    <a href="/edit-artist/${artist.id}">
+                      Edit Artist
+                    </a>
+                  </p>
+
+                  <form
+                    action="/delete-artist/${artist.id}"
+                    method="POST"
+                  >
+                    <button
+                      class="delete-button"
+                      type="submit"
+                    >
+                      Delete Artist
+                    </button>
+                  </form>
                 </section>
-              `
-            )
+              `;
+            })
             .join("")
         : "<p>No artists found.</p>";
 
@@ -1125,42 +1165,12 @@ app.get("/artists", (req, res) => {
         <html lang="en">
         <head>
           <meta charset="UTF-8">
-          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <meta
+            name="viewport"
+            content="width=device-width, initial-scale=1.0"
+          >
           <title>Artists - GigTracker</title>
-
-          <style>
-            body {
-              font-family: Arial, sans-serif;
-              margin: 0;
-              background: #f4f4f4;
-              color: #222;
-            }
-
-            nav {
-              background: #111827;
-              padding: 20px 40px;
-            }
-
-            nav a {
-              color: white;
-              text-decoration: none;
-              margin-right: 20px;
-              font-weight: bold;
-            }
-
-            main {
-              padding: 40px;
-            }
-
-            .artist-card {
-              background: white;
-              padding: 20px;
-              margin-bottom: 15px;
-              border-radius: 8px;
-              max-width: 600px;
-            }
-          </style>
-<link rel="stylesheet" href="/styles.css">
+          <link rel="stylesheet" href="/styles.css">
         </head>
 
         <body>
@@ -1176,14 +1186,75 @@ app.get("/artists", (req, res) => {
 
           <main>
             <h1>Artists</h1>
-            <p>Browse and manage artists in your collection.</p>
-            <p><a href="/add-artist">Add Artist</a></p>
+            <p>
+              Browse, manage and follow artists in your collection.
+            </p>
+
+            <p>
+              <a href="/add-artist">Add Artist</a>
+            </p>
 
             ${artistCards}
           </main>
         </body>
         </html>
       `);
+    }
+  );
+});
+
+app.post("/follow-artist/:id", (req, res) => {
+  const artistId = req.params.id;
+
+  db.get(
+    "SELECT id FROM artists WHERE id = ?",
+    [artistId],
+    (artistErr, artist) => {
+      if (artistErr) {
+        return res
+          .status(500)
+          .send("Database error: " + artistErr.message);
+      }
+
+      if (!artist) {
+        return res.status(404).send("Artist not found.");
+      }
+
+      db.run(
+        `INSERT OR IGNORE INTO user_artist_follows
+         (user_id, artist_id)
+         VALUES (?, ?)`,
+        [req.session.userId, artistId],
+        (followErr) => {
+          if (followErr) {
+            return res
+              .status(500)
+              .send("Database error: " + followErr.message);
+          }
+
+          res.redirect("/artists");
+        }
+      );
+    }
+  );
+});
+
+app.post("/unfollow-artist/:id", (req, res) => {
+  const artistId = req.params.id;
+
+  db.run(
+    `DELETE FROM user_artist_follows
+     WHERE user_id = ?
+       AND artist_id = ?`,
+    [req.session.userId, artistId],
+    (err) => {
+      if (err) {
+        return res
+          .status(500)
+          .send("Database error: " + err.message);
+      }
+
+      res.redirect("/artists");
     }
   );
 });
