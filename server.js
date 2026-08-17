@@ -731,6 +731,20 @@ app.get("/gigs", (req, res) => {
               ${escapeHtml(req.session.userName)}.
             </p>
 
+            ${
+              req.query.success === "1"
+                ? `
+                  <div
+                    class="message message-success"
+                    role="status"
+                  >
+                    <strong>Success:</strong>
+                    Gig action completed successfully.
+                  </div>
+                `
+                : ""
+            }
+
             <section class="gig-card">
               <h2>Search and Filter</h2>
 
@@ -1335,11 +1349,11 @@ app.post("/edit-gig/:id", (req, res) => {
                           );
                       }
 
-                      res.redirect("/gigs");
+                      res.redirect("/gigs?success=1");
                     }
                   );
                 } else {
-                  res.redirect("/gigs");
+                  res.redirect("/gigs?success=1");
                 }
               }
             );
@@ -1550,7 +1564,7 @@ db.serialize(() => {
                       return res.status(500).send("Attendance database error: " + attendanceErr.message);
                     }
 
-                    res.redirect("/gigs");
+                    res.redirect("/gigs?success=1");
                   }
                 );
               }
@@ -1612,7 +1626,7 @@ app.post("/delete-gig/:id", (req, res) => {
                   return res.status(404).send("Gig not found.");
                 }
 
-                res.redirect("/gigs");
+                res.redirect("/gigs?success=1");
               }
             );
           }
@@ -1749,7 +1763,7 @@ app.post("/add-artist", (req, res) => {
               .send("Artist insert error: " + insertErr.message);
           }
 
-          res.redirect("/artists");
+          res.redirect("/artists?success=1");
         }
       );
     }
@@ -1950,7 +1964,7 @@ app.post("/edit-artist/:id", (req, res) => {
                       .send("Artist not found.");
                   }
 
-                  res.redirect("/artists");
+                  res.redirect("/artists?success=1");
                 }
               );
             }
@@ -2003,11 +2017,61 @@ app.post("/delete-artist/:id", (req, res) => {
           }
 
           if (row.gigCount > 0) {
-            return res
-              .status(400)
-              .send(
-                "This artist is linked to one or more gigs and cannot be deleted."
-              );
+            return res.status(400).send(`
+              <!DOCTYPE html>
+              <html lang="en">
+
+              <head>
+                <meta charset="UTF-8">
+                <meta
+                  name="viewport"
+                  content="width=device-width, initial-scale=1.0"
+                >
+                <title>Cannot Delete Artist - GigTracker</title>
+                <link rel="stylesheet" href="/styles.css">
+              </head>
+
+              <body>
+                <nav>
+                  <a href="/">Home</a>
+                  <a href="/dashboard">Dashboard</a>
+                  <a href="/gigs">Gigs</a>
+                  <a href="/add-gig">Add Gig</a>
+                  <a href="/artists">Artists</a>
+                  <a href="/venues">Venues</a>
+                </nav>
+
+                <main class="page">
+                  <div
+                    class="message message-warning"
+                    role="alert"
+                  >
+                    <h1>Artist cannot be deleted</h1>
+
+                    <p>
+                      This artist is still linked to one or more gigs.
+                    </p>
+
+                    <p>
+                      Open <strong>My Gigs</strong> and edit or delete
+                      the linked gig first. You can then return to
+                      Artists and delete this artist.
+                    </p>
+
+                    <p>
+                      <a class="button" href="/gigs">
+                        Go to My Gigs
+                      </a>
+
+                      <a class="action-link" href="/artists">
+                        Return to Artists
+                      </a>
+                    </p>
+                  </div>
+                </main>
+              </body>
+              </html>
+            `);
           }
 
           db.run(
@@ -2034,7 +2098,7 @@ app.post("/delete-artist/:id", (req, res) => {
                   .send("Artist not found.");
               }
 
-              res.redirect("/artists");
+              res.redirect("/artists?success=1");
             }
           );
         }
@@ -2179,6 +2243,20 @@ app.get("/artists", (req, res) => {
               </a>
             </p>
 
+            ${
+              req.query.success === "1"
+                ? `
+                  <div
+                    class="message message-success"
+                    role="status"
+                  >
+                    <strong>Success:</strong>
+                    Artist action completed successfully.
+                  </div>
+                `
+                : ""
+            }
+
             ${artistCards}
           </main>
         </body>
@@ -2217,7 +2295,7 @@ app.post("/follow-artist/:id", (req, res) => {
               .send("Database error: " + followErr.message);
           }
 
-          res.redirect("/artists");
+          res.redirect("/artists?success=1");
         }
       );
     }
@@ -2239,7 +2317,7 @@ app.post("/unfollow-artist/:id", (req, res) => {
           .send("Database error: " + err.message);
       }
 
-      res.redirect("/artists");
+      res.redirect("/artists?success=1");
     }
   );
 });

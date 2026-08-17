@@ -293,3 +293,20 @@ textarea:focus-visible {
   outline: 3px solid #f59e0b;
   outline-offset: 3px;
 }
+
+/* Usability feedback messages */
+
+.message-success,
+.message-warning {
+  margin: 18px 0;
+}
+
+.message-success {
+  border-left: 6px solid #15803d;
+  background-color: #f0fdf4;
+}
+
+.message-warning {
+  border-left: 6px solid #b45309;
+  background-color: #fffbeb;
+}
