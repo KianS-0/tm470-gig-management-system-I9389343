@@ -1147,7 +1147,7 @@ app.get("/edit-gig/:id", (req, res) => {
           <a href="/register">Register</a>
         </nav>
 
-        <div class="page">
+        <main class="page">
           <div class="card">
             <h1>Edit Gig</h1>
 
@@ -1226,7 +1226,7 @@ app.get("/edit-gig/:id", (req, res) => {
               <button type="submit">Save Changes</button>
             </form>
           </div>
-        </div>
+        </main>
       </body>
       </html>
     `);

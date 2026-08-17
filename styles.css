@@ -282,3 +282,14 @@ button:hover,
     background-position: 60% center;
   }
 }
+
+/* Clear keyboard focus for interactive controls */
+
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 3px solid #f59e0b;
+  outline-offset: 3px;
+}
