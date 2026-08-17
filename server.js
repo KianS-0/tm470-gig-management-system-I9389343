@@ -2,10 +2,13 @@ const express = require("express");
 const path = require("path");
 const bcrypt = require("bcryptjs");
 const session = require("express-session");
+const crypto = require("crypto");
 const db = require("./database");
 
 const app = express();
 const PORT = 3000;
+// Do not advertise that the application uses Express
+app.disable("x-powered-by");
 
 // Allow Express to read form data later
 app.use(express.urlencoded({ extended: true }));
@@ -15,7 +18,7 @@ app.use(
   session({
     secret:
       process.env.SESSION_SECRET ||
-      "gigtracker-development-session-secret",
+      crypto.randomBytes(32).toString("hex"),
     resave: false,
     saveUninitialized: false,
     cookie: {
@@ -53,6 +56,13 @@ function requireLogin(req, res, next) {
   if (req.session.userId) {
     return next();
   }
+
+  // API requests should return JSON instead of redirecting to Login
+if (req.path.startsWith("/api/")) {
+  return res.status(401).json({
+    error: "Authentication required."
+  });
+}
 
   // If someone manually visits a private page, send them to Login
   if (req.method === "GET") {
@@ -1046,6 +1056,13 @@ app.get("/edit-gig/:id", (req, res) => {
     }
 
     const status = gig.attendance_status || "Maybe";
+    const escapeHtml = (value) =>
+      String(value || "")
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
 
     res.send(`
       <!DOCTYPE html>
@@ -1140,7 +1157,7 @@ app.get("/edit-gig/:id", (req, res) => {
                 type="text"
                 id="title"
                 name="title"
-                value="${gig.title}"
+                value="${escapeHtml(gig.title)}"
                 required
               >
 
@@ -1149,7 +1166,7 @@ app.get("/edit-gig/:id", (req, res) => {
                 type="text"
                 id="artist"
                 name="artist"
-                value="${gig.artist_name}"
+                value="${escapeHtml(gig.artist_name)}"
                 required
               >
 
@@ -1158,7 +1175,7 @@ app.get("/edit-gig/:id", (req, res) => {
                 type="text"
                 id="venue"
                 name="venue"
-                value="${gig.venue_name}"
+                value="${escapeHtml(gig.venue_name)}"
                 required
               >
 
@@ -1167,7 +1184,7 @@ app.get("/edit-gig/:id", (req, res) => {
                 type="text"
                 id="city"
                 name="city"
-                value="${gig.venue_city}"
+                value="${escapeHtml(gig.venue_city)}"
                 required
               >
 
@@ -1185,7 +1202,7 @@ app.get("/edit-gig/:id", (req, res) => {
                 type="url"
                 id="ticket-url"
                 name="ticket_url"
-                value="${gig.ticket_url || ""}"
+                value="${escapeHtml(gig.ticket_url || "")}"
               >
 
               <label for="attendance-status">Attendance Status</label>
@@ -1204,7 +1221,7 @@ app.get("/edit-gig/:id", (req, res) => {
               </select>
 
               <label for="notes">Notes</label>
-              <textarea id="notes" name="notes">${gig.notes || ""}</textarea>
+              <textarea id="notes" name="notes">${escapeHtml(gig.notes || "")}</textarea>
 
               <button type="submit">Save Changes</button>
             </form>
@@ -2846,7 +2863,9 @@ app.post("/login", (req, res) => {
   const { email, password } = req.body;
 
   if (!email || !password) {
-    return res.status(400).send("Please enter your email and password.");
+    return res
+      .status(400)
+      .send("Please enter your email and password.");
   }
 
   const cleanEmail = email.trim().toLowerCase();
@@ -2858,37 +2877,60 @@ app.post("/login", (req, res) => {
     [cleanEmail],
     (lookupErr, user) => {
       if (lookupErr) {
-        return res.status(500).send("Login error: " + lookupErr.message);
+        return res
+          .status(500)
+          .send("Login error: " + lookupErr.message);
       }
 
       // Use the same message for a wrong email or password
       // so the application does not reveal registered email addresses.
       if (!user) {
-        return res.status(401).send("Incorrect email or password.");
+        return res
+          .status(401)
+          .send("Incorrect email or password.");
       }
 
-      bcrypt.compare(password, user.password_hash, (compareErr, matches) => {
-        if (compareErr) {
-          return res.status(500).send("Could not verify password.");
-        }
-
-        if (!matches) {
-          return res.status(401).send("Incorrect email or password.");
-        }
-
-        // Store only the information needed to identify the logged-in user.
-        req.session.userId = user.id;
-        req.session.userName = user.name;
-        req.session.userEmail = user.email;
-
-        req.session.save((sessionErr) => {
-          if (sessionErr) {
-            return res.status(500).send("Could not start login session.");
+      bcrypt.compare(
+        password,
+        user.password_hash,
+        (compareErr, matches) => {
+          if (compareErr) {
+            return res
+              .status(500)
+              .send("Could not verify password.");
           }
 
-          res.redirect("/");
-        });
-      });
+          if (!matches) {
+            return res
+              .status(401)
+              .send("Incorrect email or password.");
+          }
+
+          // Regenerate the session after login
+          // to reduce session fixation risk.
+          req.session.regenerate((regenerateErr) => {
+            if (regenerateErr) {
+              return res
+                .status(500)
+                .send("Could not start login session.");
+            }
+
+            req.session.userId = user.id;
+            req.session.userName = user.name;
+            req.session.userEmail = user.email;
+
+            req.session.save((sessionErr) => {
+              if (sessionErr) {
+                return res
+                  .status(500)
+                  .send("Could not start login session.");
+              }
+
+              res.redirect("/");
+            });
+          });
+        }
+      );
     }
   );
 });
@@ -2940,6 +2982,14 @@ app.post("/register", (req, res) => {
   const cleanName = name.trim();
   const cleanEmail = email.trim().toLowerCase();
 
+  const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+  if (!emailPattern.test(cleanEmail)) {
+    return res
+      .status(400)
+      .send("Please enter a valid email address.");
+  }
+
   if (!cleanName || !cleanEmail) {
     return res.status(400).send("Name and email cannot be blank.");
   }
@@ -2949,6 +2999,12 @@ app.post("/register", (req, res) => {
     return res
       .status(400)
       .send("Password must be at least 8 characters long.");
+  }
+
+    if (password.length > 128) {
+    return res
+      .status(400)
+      .send("Password must be 128 characters or fewer.");
   }
 
   // Both password fields must match
