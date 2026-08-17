@@ -9,7 +9,9 @@
   "scripts": {
     "start": "node server.js",
     "init-db": "node init-db.js",
-    "seed-db": "node seed-db.js"
+    "seed-db": "node seed-db.js",
+    "test": "node tests/integration-tests.js",
+    "check": "node --check server.js && node --check database.js && node --check tests/integration-tests.js"
   },
   "repository": {
     "type": "git",
